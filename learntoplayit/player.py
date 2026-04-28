@@ -1,12 +1,15 @@
 import sys
 import tty
 import termios
-import threading
 
 import numpy as np
 import sounddevice as sd
 
-from .audio import load_all_stems, mix_stems
+from .audio import load_all_stems, mix_stems, process_audio
+
+SPEED_MIN = 0.25
+SPEED_MAX = 1.5
+SPEED_STEP = 0.05
 
 
 def _read_key():
@@ -27,11 +30,22 @@ class Player:
         self.mode = initial_mode
         self.speed = initial_speed
 
-        self.audio = mix_stems(self.stems, self.mode, self.part)
+        self.raw_audio = mix_stems(self.stems, self.mode, self.part)
+        self._rebuild_audio()
+        self.original_pos = 0.0
         self.pos = 0
         self.playing = False
         self.quit = False
         self.stream = None
+
+    def _rebuild_audio(self):
+        self.audio = process_audio(self.raw_audio, self.sr, self.speed, 0.0)
+
+    def _original_pos_from_buffer(self):
+        return self.pos * self.speed
+
+    def _buffer_pos_from_original(self):
+        return int(self.original_pos / self.speed)
 
     def _callback(self, outdata, frames, time_info, status):
         if not self.playing:
@@ -49,23 +63,25 @@ class Player:
         self.pos = min(end, len(self.audio))
 
     def _print_status(self):
-        pos_secs = self.pos / self.sr
-        total_secs = len(self.audio) / self.sr
+        original_secs = self._original_pos_from_buffer() / self.sr
+        total_secs = len(self.raw_audio) / self.sr
         state = "▶" if self.playing else "⏸"
+        speed_pct = int(round(self.speed * 100))
         print(
-            f"\r  {state} {pos_secs:5.1f}s / {total_secs:.1f}s  |  "
+            f"\r  {state} {original_secs:5.1f}s / {total_secs:.1f}s  |  "
+            f"speed: {speed_pct}%  |  "
             f"mode: {self.mode}  |  part: {self.part}     ",
             end="", flush=True,
         )
 
     def run(self):
         print(f"Playing: {self.part} ({self.mode})")
-        print("Controls: SPACE=play/pause  S=cycle mode  0=restart  Q=quit")
+        print("Controls: SPACE=play/pause  W/X=speed up/down  S=cycle mode  0=restart  Q=quit")
         print()
 
         self.stream = sd.OutputStream(
             samplerate=self.sr,
-            channels=self.audio.shape[1] if self.audio.ndim > 1 else 1,
+            channels=self.raw_audio.shape[1] if self.raw_audio.ndim > 1 else 1,
             callback=self._callback,
             blocksize=2048,
         )
@@ -82,6 +98,28 @@ class Player:
             self.stream.close()
             print()
 
+    def _rebuild_at_position(self):
+        was_playing = self.playing
+        self.playing = False
+        self.original_pos = self._original_pos_from_buffer()
+        self._rebuild_audio()
+        self.pos = min(self._buffer_pos_from_original(), max(0, len(self.audio) - 1))
+        self.playing = was_playing
+
+    def _change_speed(self, delta):
+        new_speed = round(min(SPEED_MAX, max(SPEED_MIN, self.speed + delta)), 2)
+        if new_speed == self.speed:
+            return
+        self.speed = new_speed
+        self._rebuild_at_position()
+
+    def _change_mode(self):
+        modes = ["solo", "mute", "mix"]
+        idx = (modes.index(self.mode) + 1) % len(modes)
+        self.mode = modes[idx]
+        self.raw_audio = mix_stems(self.stems, self.mode, self.part)
+        self._rebuild_at_position()
+
     def _handle_key(self, key):
         if key == " ":
             self.playing = not self.playing
@@ -89,14 +127,14 @@ class Player:
             self.quit = True
         elif key == "0":
             self.pos = 0
+            self.original_pos = 0.0
             self.playing = True
         elif key.lower() == "s":
-            modes = ["solo", "mute", "mix"]
-            idx = (modes.index(self.mode) + 1) % len(modes)
-            self.mode = modes[idx]
-            self.audio = mix_stems(self.stems, self.mode, self.part)
-            if self.pos > len(self.audio):
-                self.pos = 0
+            self._change_mode()
+        elif key.lower() == "w":
+            self._change_speed(SPEED_STEP)
+        elif key.lower() == "x":
+            self._change_speed(-SPEED_STEP)
 
 
 def play_interactive(stems_dir, part, initial_mode="solo", initial_speed=0.5):
