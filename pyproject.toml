@@ -10,6 +10,7 @@ license = "MIT"
 requires-python = ">=3.10"
 dependencies = [
     "demucs",
+    "torchcodec",
     "pyrubberband",
     "soundfile",
     "sounddevice",

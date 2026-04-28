@@ -9,11 +9,11 @@
 
 ## Phase 2: Source separation
 
-- [ ] 2.1 Implement `separate.py` — wrapper around Demucs that takes an audio file path and produces stems in `stems/<song-name>/`
-- [ ] 2.2 Add stem caching: skip separation if stems already exist for a given song
-- [ ] 2.3 Wire up `ltpi separate <file>` command
-- [ ] 2.4 Wire up `ltpi parts <file>` command (list available stems)
-- [ ] 2.5 Test with a real audio file end-to-end
+- [x] 2.1 Implement `separate.py` — wrapper around Demucs that takes an audio file path and produces stems in `stems/<song-name>/`
+- [x] 2.2 Add stem caching: skip separation if stems already exist for a given song
+- [x] 2.3 Wire up `ltpi separate <file>` command
+- [x] 2.4 Wire up `ltpi parts <file>` command (list available stems)
+- [x] 2.5 Test with a real audio file end-to-end
 
 ## Phase 3: Audio processing
 

@@ -11,11 +11,18 @@ def main():
 @click.argument("audio_file", type=click.Path(exists=True))
 def separate(audio_file):
     """Separate a song into individual instrument stems."""
-    click.echo(f"Separating {audio_file} into stems...")
-    from .separate import separate_stems
+    from .separate import separate_stems, stems_exist, get_stems_dir, STEM_NAMES
 
-    stems_dir = separate_stems(audio_file)
-    click.echo(f"Done. Stems saved to {stems_dir}")
+    if stems_exist(audio_file):
+        stems_dir = get_stems_dir(audio_file)
+        click.echo(f"Stems already exist in {stems_dir}/")
+    else:
+        click.echo(f"Separating {audio_file} into stems (this may take a few minutes)...")
+        stems_dir = separate_stems(audio_file)
+        click.echo(f"Done. Stems saved to {stems_dir}/")
+
+    for name in STEM_NAMES:
+        click.echo(f"  {name}.wav")
 
 
 @main.command()
