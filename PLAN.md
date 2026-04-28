@@ -17,10 +17,10 @@
 
 ## Phase 3: Audio processing
 
-- [ ] 3.1 Implement `audio.py` — load stems with soundfile, return numpy arrays and sample rate
-- [ ] 3.2 Add time-stretching (change speed without changing pitch) using pyrubberband
-- [ ] 3.3 Add pitch-shifting (change pitch in cents without changing speed) using pyrubberband
-- [ ] 3.4 Add stem mixing: combine selected stems into a single output (for solo/mute/mix modes)
+- [x] 3.1 Implement `audio.py` — load stems with soundfile, return numpy arrays and sample rate
+- [x] 3.2 Add time-stretching (change speed without changing pitch) using pyrubberband
+- [x] 3.3 Add pitch-shifting (change pitch in cents without changing speed) using pyrubberband
+- [x] 3.4 Add stem mixing: combine selected stems into a single output (for solo/mute/mix modes)
 
 ## Phase 4: Interactive playback
 
