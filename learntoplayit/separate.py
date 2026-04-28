@@ -1,7 +1,7 @@
 import shutil
 from pathlib import Path
 
-STEM_NAMES = ["vocals", "drums", "bass", "other"]
+STEM_NAMES = ["vocals", "drums", "bass", "guitar", "piano", "other"]
 STEMS_ROOT = Path("stems")
 
 
@@ -23,7 +23,7 @@ def separate_stems(audio_file: str) -> Path:
     # We use a temp output dir, then move stems to our cache layout.
     from demucs.separate import main as demucs_main
 
-    model = "htdemucs"
+    model = "htdemucs_6s"
     tmp_out = STEMS_ROOT / "_tmp"
     tmp_out.mkdir(parents=True, exist_ok=True)
 

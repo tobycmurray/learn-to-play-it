@@ -45,7 +45,7 @@ def parts(audio_file):
 
 @main.command()
 @click.argument("audio_file", type=click.Path(exists=True))
-@click.argument("part", type=click.Choice(["vocals", "drums", "bass", "other"]))
+@click.argument("part", type=click.Choice(["vocals", "drums", "bass", "guitar", "piano", "other"]))
 def practice(audio_file, part):
     """Practice a part: isolated, starting at 50% speed."""
     from .separate import ensure_stems
@@ -57,7 +57,7 @@ def practice(audio_file, part):
 
 @main.command("play-along")
 @click.argument("audio_file", type=click.Path(exists=True))
-@click.argument("part", type=click.Choice(["vocals", "drums", "bass", "other"]))
+@click.argument("part", type=click.Choice(["vocals", "drums", "bass", "guitar", "piano", "other"]))
 def play_along(audio_file, part):
     """Play along with the song, your part removed."""
     from .separate import ensure_stems
