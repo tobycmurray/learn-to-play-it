@@ -6,13 +6,23 @@ A CLI tool that helps musicians learn parts from recorded songs by:
 2. **Practicing** an isolated part slowed down, with optional pitch shifting and section looping, progressively speeding up as you learn it
 3. **Playing along** with the full mix minus your instrument — like karaoke, but for any part
 
+## Prerequisites
+
+- Python 3.10+
+- FFmpeg (`brew install ffmpeg` on macOS, `apt install ffmpeg` on Debian/Ubuntu)
+- Rubber Band CLI (`brew install rubberband` on macOS, `apt install rubberband-cli` on Debian/Ubuntu)
+
 ## Installation
 
 ```bash
+git clone https://github.com/tobycmurray/learn-to-play-it.git
+cd learn-to-play-it
+python3 -m venv .venv
+source .venv/bin/activate
 pip install -e .
 ```
 
-Requires Python 3.10+ and FFmpeg installed on your system.
+This installs the `ltpi` command into your virtualenv. Activate the venv (`source .venv/bin/activate`) before each session.
 
 ## Usage
 

@@ -2,10 +2,10 @@
 
 ## Phase 1: Project scaffolding
 
-- [ ] 1.1 Create `pyproject.toml` with dependencies (demucs, pyrubberband, soundfile, sounddevice, numpy, click)
-- [ ] 1.2 Create package structure: `learntoplayit/` with `__init__.py`, `cli.py`, `separate.py`, `audio.py`, `player.py`
-- [ ] 1.3 Wire up the `ltpi` CLI entry point using Click with subcommands (`separate`, `parts`, `practice`, `play-along`)
-- [ ] 1.4 Add `.gitignore` (stems/, __pycache__/, *.egg-info, etc.)
+- [x] 1.1 Create `pyproject.toml` with dependencies (demucs, pyrubberband, soundfile, sounddevice, numpy, click)
+- [x] 1.2 Create package structure: `learntoplayit/` with `__init__.py`, `cli.py`, `separate.py`, `audio.py`, `player.py`
+- [x] 1.3 Wire up the `ltpi` CLI entry point using Click with subcommands (`separate`, `parts`, `practice`, `play-along`)
+- [x] 1.4 Add `.gitignore` (stems/, __pycache__/, *.egg-info, etc.)
 
 ## Phase 2: Source separation
 
