@@ -14,6 +14,7 @@ PITCH_STEP = 10
 PITCH_MIN = -200
 PITCH_MAX = 200
 SEEK_SECONDS = 5
+HOLD_DURATION = 0.2
 
 
 def _read_key():
@@ -48,6 +49,13 @@ class Player:
         self.loop_end_orig = None
         self.looping = False
 
+        # Hold state — positions stored in original-song samples
+        self.holding = False
+        self.hold_slice = None
+        self.hold_pos = 0
+        self.hold_start_orig = 0
+        self.hold_end_orig = 0
+
     def _rebuild_audio(self):
         self.audio = process_audio(self.raw_audio, self.sr, self.speed, self.cents)
 
@@ -70,6 +78,16 @@ class Player:
     def _callback(self, outdata, frames, time_info, status):
         if not self.playing:
             outdata[:] = 0
+            return
+
+        if self.holding and self.hold_slice is not None:
+            hold_len = len(self.hold_slice)
+            written = 0
+            while written < frames:
+                chunk = min(frames - written, hold_len - self.hold_pos)
+                outdata[written:written + chunk] = self.hold_slice[self.hold_pos:self.hold_pos + chunk]
+                self.hold_pos = (self.hold_pos + chunk) % hold_len
+                written += chunk
             return
 
         limit = len(self.audio)
@@ -97,7 +115,12 @@ class Player:
     def _print_status(self):
         original_secs = self._original_pos_from_buffer() / self.sr
         total_secs = len(self.raw_audio) / self.sr
-        state = "▶" if self.playing else "⏸"
+        if self.holding:
+            state = "⏺"
+        elif self.playing:
+            state = "▶"
+        else:
+            state = "⏸"
         speed_pct = int(round(self.speed * 100))
         cents_str = f"{self.cents:+.0f}" if self.cents != 0 else "0"
         ls_str = f"{self.loop_start_orig / self.sr:.1f}s" if self.loop_start_orig is not None else "none"
@@ -116,7 +139,8 @@ class Player:
 
     def run(self):
         print(f"Playing: {self.part} ({self.mode})")
-        print("Controls: SPACE=play/pause  W/X=speed  E/C=pitch  A/D=seek  [=loop point  L=loop  S=mode  0=restart  Q=quit")
+        print("Controls: SPACE=play/pause  W/X=speed  E/C=pitch  A/D=seek  H=hold")
+        print("          [=loop point  L=loop  S=mode  0=restart  Q=quit")
         print()
 
         self.stream = sd.OutputStream(
@@ -141,15 +165,17 @@ class Player:
     def _rebuild_at_position(self):
         was_playing = self.playing
         self.playing = False
-        self.original_pos = self._original_pos_from_buffer()
         self._rebuild_audio()
         self.pos = min(self._buffer_pos_from_original(), max(0, len(self.audio) - 1))
+        if self.holding:
+            self._rebuild_hold_slice()
         self.playing = was_playing
 
     def _change_speed(self, delta):
         new_speed = round(min(SPEED_MAX, max(SPEED_MIN, self.speed + delta)), 2)
         if new_speed == self.speed:
             return
+        self.original_pos = self._original_pos_from_buffer()
         self.speed = new_speed
         self._rebuild_at_position()
 
@@ -157,6 +183,7 @@ class Player:
         new_cents = min(PITCH_MAX, max(PITCH_MIN, self.cents + delta))
         if new_cents == self.cents:
             return
+        self.original_pos = self._original_pos_from_buffer()
         self.cents = new_cents
         self._rebuild_at_position()
 
@@ -164,6 +191,7 @@ class Player:
         modes = ["solo", "mute", "mix"]
         idx = (modes.index(self.mode) + 1) % len(modes)
         self.mode = modes[idx]
+        self.original_pos = self._original_pos_from_buffer()
         self.raw_audio = mix_stems(self.stems, self.mode, self.part)
         self._rebuild_at_position()
 
@@ -196,6 +224,27 @@ class Player:
                 # End before start: treat as new start
                 self.loop_start_orig = current
                 self.loop_end_orig = None
+
+    def _toggle_hold(self):
+        if self.holding:
+            self.holding = False
+            self.hold_slice = None
+            self.pos = int(self.hold_end_orig / self.speed)
+        else:
+            hold_orig_samples = int(HOLD_DURATION * self.sr)
+            current_orig = int(self._original_pos_from_buffer())
+            self.hold_start_orig = max(0, current_orig - hold_orig_samples)
+            self.hold_end_orig = current_orig
+            self._rebuild_hold_slice()
+            if len(self.hold_slice) == 0:
+                return
+            self.holding = True
+
+    def _rebuild_hold_slice(self):
+        buf_start = int(self.hold_start_orig / self.speed)
+        buf_end = int(self.hold_end_orig / self.speed)
+        self.hold_slice = self.audio[buf_start:buf_end].copy()
+        self.hold_pos = 0
 
     def _toggle_loop(self):
         if self.loop_start_orig is None or self.loop_end_orig is None:
@@ -230,6 +279,8 @@ class Player:
             self._seek(-SEEK_SECONDS)
         elif key.lower() == "d":
             self._seek(SEEK_SECONDS)
+        elif key.lower() == "h":
+            self._toggle_hold()
         elif key == "[":
             self._set_loop_point()
         elif key.lower() == "l":
