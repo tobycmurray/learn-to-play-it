@@ -24,18 +24,18 @@
 
 ## Phase 4: Interactive playback
 
-- [ ] 4.1 Implement basic `player.py` — play a numpy audio array through sounddevice with play/pause and position tracking
-- [ ] 4.2 Add real-time speed control (re-stretch on speed change)
-- [ ] 4.3 Add real-time pitch control (re-shift on pitch change)
-- [ ] 4.4 Add mode cycling (solo / mute / mix) — re-mix stems on mode change
-- [ ] 4.5 Add loop points: `[` / `]` to set, `L` to toggle, playback wraps within loop
-- [ ] 4.6 Add seek-to-start (`0` key)
-- [ ] 4.7 Add terminal UI: show current position, speed, pitch, mode, loop status
+- [x] 4.1 Implement basic `player.py` — play a numpy audio array through sounddevice with play/pause and position tracking
+- [x] 4.2 Add real-time speed control (re-stretch on speed change)
+- [x] 4.3 Add real-time pitch control (re-shift on pitch change)
+- [x] 4.4 Add mode cycling (solo / mute / mix) — re-mix stems on mode change
+- [x] 4.5 Add loop points: `[` to set start/end, `L` to toggle, playback wraps within loop
+- [x] 4.6 Add seek (`A`/`D` ±5s, `0` restart), hold (`H` freezes last 100ms)
+- [x] 4.7 Add terminal UI: show current position, speed, pitch, mode, loop status
 
 ## Phase 5: CLI integration
 
-- [ ] 5.1 Wire up `ltpi practice <file> <part>` — auto-separate if needed, then enter interactive playback in solo mode at 50% speed
-- [ ] 5.2 Wire up `ltpi play-along <file> <part>` — same but mute mode at 100% speed
+- [x] 5.1 Wire up `ltpi practice <file> <part>` — auto-separate if needed, then enter interactive playback in solo mode at 50% speed
+- [x] 5.2 Wire up `ltpi play-along <file> <part>` — same but mute mode at 100% speed
 - [ ] 5.3 Handle edge cases: missing file, invalid part name, missing FFmpeg, etc.
 - [ ] 5.4 End-to-end manual test of full workflow
 
