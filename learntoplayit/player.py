@@ -10,6 +10,9 @@ from .audio import load_all_stems, mix_stems, process_audio
 SPEED_MIN = 0.25
 SPEED_MAX = 1.5
 SPEED_STEP = 0.05
+PITCH_STEP = 10
+PITCH_MIN = -200
+PITCH_MAX = 200
 
 
 def _read_key():
@@ -29,6 +32,7 @@ class Player:
         self.part = part
         self.mode = initial_mode
         self.speed = initial_speed
+        self.cents = 0.0
 
         self.raw_audio = mix_stems(self.stems, self.mode, self.part)
         self._rebuild_audio()
@@ -39,7 +43,7 @@ class Player:
         self.stream = None
 
     def _rebuild_audio(self):
-        self.audio = process_audio(self.raw_audio, self.sr, self.speed, 0.0)
+        self.audio = process_audio(self.raw_audio, self.sr, self.speed, self.cents)
 
     def _original_pos_from_buffer(self):
         return self.pos * self.speed
@@ -67,16 +71,17 @@ class Player:
         total_secs = len(self.raw_audio) / self.sr
         state = "▶" if self.playing else "⏸"
         speed_pct = int(round(self.speed * 100))
+        cents_str = f"{self.cents:+.0f}" if self.cents != 0 else "0"
         print(
             f"\r  {state} {original_secs:5.1f}s / {total_secs:.1f}s  |  "
-            f"speed: {speed_pct}%  |  "
+            f"speed: {speed_pct}%  |  pitch: {cents_str}c  |  "
             f"mode: {self.mode}  |  part: {self.part}     ",
             end="", flush=True,
         )
 
     def run(self):
         print(f"Playing: {self.part} ({self.mode})")
-        print("Controls: SPACE=play/pause  W/X=speed up/down  S=cycle mode  0=restart  Q=quit")
+        print("Controls: SPACE=play/pause  W/X=speed  E/C=pitch  S=cycle mode  0=restart  Q=quit")
         print()
 
         self.stream = sd.OutputStream(
@@ -113,6 +118,13 @@ class Player:
         self.speed = new_speed
         self._rebuild_at_position()
 
+    def _change_pitch(self, delta):
+        new_cents = min(PITCH_MAX, max(PITCH_MIN, self.cents + delta))
+        if new_cents == self.cents:
+            return
+        self.cents = new_cents
+        self._rebuild_at_position()
+
     def _change_mode(self):
         modes = ["solo", "mute", "mix"]
         idx = (modes.index(self.mode) + 1) % len(modes)
@@ -135,6 +147,10 @@ class Player:
             self._change_speed(SPEED_STEP)
         elif key.lower() == "x":
             self._change_speed(-SPEED_STEP)
+        elif key.lower() == "e":
+            self._change_pitch(PITCH_STEP)
+        elif key.lower() == "c":
+            self._change_pitch(-PITCH_STEP)
 
 
 def play_interactive(stems_dir, part, initial_mode="solo", initial_speed=0.5):
