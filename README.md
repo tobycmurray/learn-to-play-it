@@ -12,7 +12,6 @@ A CLI tool that helps musicians learn parts from recorded songs by:
 
 - Python 3.10+
 - FFmpeg (`brew install ffmpeg` on macOS, `apt install ffmpeg` on Debian/Ubuntu)
-- Rubber Band CLI (`brew install rubberband` on macOS, `apt install rubberband-cli` on Debian/Ubuntu)
 
 ## Installation
 
@@ -124,8 +123,7 @@ Use `--stems-dir` to store stems in a custom location (default: `./stems`).
 ## How it works
 
 - **Source separation**: [Demucs](https://github.com/adefossez/demucs) (Meta Research) splits audio into six stems: vocals, drums, bass, guitar, piano, and other
-- **Time-stretching**: [Rubber Band](https://breakfastquay.com/rubberband/) changes playback speed without affecting pitch
-- **Pitch-shifting**: Rubber Band shifts pitch in cents without affecting speed
+- **Time-stretching & pitch-shifting**: [Rubber Band](https://breakfastquay.com/rubberband/) (via [pylibrb](https://github.com/pawel-glomski/pylibrb)) processes audio in real-time — speed and pitch changes are instant with no playback pause
 - **Playback**: [sounddevice](https://python-sounddevice.readthedocs.io/) provides low-latency audio output
 
 ## Stem cache

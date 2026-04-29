@@ -22,7 +22,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg rubberband-cli libsndfile1 libportaudio2
+          sudo apt-get install -y ffmpeg libsndfile1 libportaudio2
 
       - name: Cache pip packages
         uses: actions/cache@v4

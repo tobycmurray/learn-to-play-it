@@ -6,12 +6,12 @@ build-backend = "setuptools.build_meta"
 name = "learn-to-play-it"
 version = "0.1.0"
 description = "Learn to play musical parts from recorded songs"
-license = "MIT"
+license = "GPL-2.0-or-later"
 requires-python = ">=3.10"
 dependencies = [
     "demucs",
     "torchcodec",
-    "pyrubberband",
+    "pylibrb",
     "soundfile",
     "sounddevice",
     "numpy",

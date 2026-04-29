@@ -22,9 +22,9 @@ Unless otherwise noted, start each section from a fresh launch.
 | Step | Action | Expected |
 |------|--------|----------|
 | 2.1 | Press SPACE to pause | Paused |
-| 2.2 | Press S twice | Speed shows 30%. Status shows "(stretching...)" during processing. No audio (paused) |
+| 2.2 | Press S twice | Speed shows 30%. No audio (paused) |
 | 2.3 | Press SPACE to resume | Audio plays at 30% speed (noticeably slower, pitch unchanged) |
-| 2.4 | Press W three times | Speed shows 60%. Status shows "(stretching...)" during each re-stretch, then resumes. Position doesn't jump back |
+| 2.4 | Press W three times | Speed shows 60%. Change is instant — no pause. Position doesn't jump back |
 | 2.5 | Press W repeatedly until 150% | Speed caps at 150%, further W presses are no-ops |
 | 2.6 | Press S repeatedly until 20% | Speed caps at 20%, further S presses are no-ops |
 
@@ -32,7 +32,7 @@ Unless otherwise noted, start each section from a fresh launch.
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 3.1 | Press E | Pitch shows +10c. Status shows "(pitch-shifting...)" then audio resumes pitched slightly up |
+| 3.1 | Press E | Pitch shows +10c. Change is instant — audio pitched slightly up |
 | 3.2 | Press E again | Pitch shows +20c. Audibly higher than original |
 | 3.3 | Press D three times | Pitch shows -10c. Audio pitched slightly below original |
 | 3.4 | Verify position | Position should not jump; continues from where it was |
@@ -90,7 +90,7 @@ Unless otherwise noted, start each section from a fresh launch.
 | Step | Action | Expected |
 |------|--------|----------|
 | 8.1 | Set a loop and enable it | Looping at some speed |
-| 8.2 | Press W or S to change speed | After re-stretch, playback resumes inside the loop region. Position doesn't jump outside the loop |
+| 8.2 | Press W or S to change speed | Change is instant. Playback stays inside the loop region. Position doesn't jump outside the loop |
 | 8.3 | Verify loop boundaries | Loop still corresponds to the same section of the song (same musical content) |
 
 ## 9. Loop point precision (nudge workflow)
@@ -111,7 +111,7 @@ Unless otherwise noted, start each section from a fresh launch.
 | Step | Action | Expected |
 |------|--------|----------|
 | 10.1 | Play until an interesting note, press H | Status shows `⏺`. A short slice of audio repeats continuously |
-| 10.2 | Press E or D while holding | Pitch changes audibly on the held note (brief silence during rebuild) |
+| 10.2 | Press E or D while holding | Pitch changes audibly on the held note |
 | 10.3 | Press W or S while holding | Speed changes audibly on the held note |
 | 10.4 | Press H again | Hold released. Playback resumes from where hold was activated. Status shows `▶` |
 

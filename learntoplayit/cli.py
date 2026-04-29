@@ -7,7 +7,6 @@ def _check_prerequisites():
     missing = []
     for name, hint in [
         ("ffmpeg", "brew install ffmpeg (macOS) / apt install ffmpeg (Linux)"),
-        ("rubberband", "brew install rubberband (macOS) / apt install rubberband-cli (Linux)"),
     ]:
         if shutil.which(name) is None:
             missing.append(f"  - '{name}': {hint}")

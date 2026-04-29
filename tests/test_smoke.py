@@ -28,9 +28,6 @@ def test_import_audio():
     from learntoplayit.audio import (
         load_stem,
         load_all_stems,
-        time_stretch,
-        pitch_shift,
-        process_audio,
         mix_stems,
     )
 
@@ -57,8 +54,8 @@ def test_import_soundfile():
     import soundfile as sf
 
 
-def test_import_pyrubberband():
-    import pyrubberband as pyrb
+def test_import_pylibrb():
+    from pylibrb import RubberBandStretcher, Option
 
 
 @needs_portaudio
