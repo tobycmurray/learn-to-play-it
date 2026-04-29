@@ -1,5 +1,20 @@
 """Smoke tests: verify the package installs and key dependencies import."""
 
+import pytest
+
+
+def _has_portaudio():
+    try:
+        import sounddevice  # noqa: F401
+        return True
+    except OSError:
+        return False
+
+
+needs_portaudio = pytest.mark.skipif(
+    not _has_portaudio(), reason="PortAudio library not available"
+)
+
 
 def test_import_package():
     import learntoplayit
@@ -29,6 +44,7 @@ def test_import_separate():
     )
 
 
+@needs_portaudio
 def test_import_player():
     from learntoplayit.player import Player, play_interactive
 
@@ -45,6 +61,7 @@ def test_import_pyrubberband():
     import pyrubberband as pyrb
 
 
+@needs_portaudio
 def test_import_sounddevice():
     import sounddevice as sd
 
