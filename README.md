@@ -45,17 +45,18 @@ Opens an interactive playback session with the bass part isolated, starting at 5
 | Key     | Action                                |
 |---------|---------------------------------------|
 | `SPACE` | Play / pause                          |
-| `W`/`X` | Speed up / down ±10% (range: 20%–150%) |
-| `E`/`C` | Pitch up / down ±10 cents (range: ±200c) |
-| `A`/`D` | Seek back / forward 5 seconds        |
-| `[`     | Set loop point (first press = start, second = end) |
+| `W`/`S` | Speed up / down ±10% (range: 20%–150%) |
+| `E`/`D` | Pitch up / down ±10 cents (range: ±200c) |
+| `Z`/`V` | Seek back / forward 5 seconds        |
+| `X`/`C` | Nudge back / forward 0.05 seconds    |
+| `[`/`]` | Set loop start / end                  |
 | `L`     | Toggle loop on/off                    |
-| `H`     | Hold — freeze last 100ms and loop it |
-| `S`     | Cycle mode: solo → mute → mix        |
-| `0`     | Restart from beginning                |
+| `H`     | Hold — freeze last 200ms and loop it |
+| `M`     | Cycle mode: solo → mute → mix        |
+| `0`     | Restart (or loop start if looping)    |
 | `Q`     | Quit                                  |
 
-**Modes** (cycled with `S`):
+**Modes** (cycled with `M`):
 - **solo** — hear only the selected part
 - **mute** — hear everything *except* the selected part (play-along)
 - **mix** — hear the full original mix

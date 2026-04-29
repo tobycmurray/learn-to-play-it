@@ -187,8 +187,8 @@ class Player:
 
     def run(self):
         print(f"Playing: {self.part} ({self.mode})")
-        print("Controls: SPACE=play/pause  W/X=speed  E/C=pitch  A/D=seek  Z/V=nudge  H=hold")
-        print("          [/]=loop start/end  L=loop  S=mode  0=restart  Q=quit")
+        print("Controls: SPACE=play/pause  W/S=speed  E/D=pitch  Z/X/C/V=seek  H=hold")
+        print("          [/]=loop start/end  L=loop  M=mode  0=restart  Q=quit")
         print()
 
         self.stream = sd.OutputStream(
@@ -308,24 +308,24 @@ class Player:
                 self.pos_orig = loop.start_orig
             else:
                 self.pos_orig = 0
-        elif key.lower() == "s":
-            self._change_mode()
         elif key.lower() == "w":
             self._change_speed(SPEED_STEP)
-        elif key.lower() == "x":
+        elif key.lower() == "s":
             self._change_speed(-SPEED_STEP)
         elif key.lower() == "e":
             self._change_pitch(PITCH_STEP)
-        elif key.lower() == "c":
-            self._change_pitch(-PITCH_STEP)
-        elif key.lower() == "a":
-            self._seek(-SEEK_SECONDS)
         elif key.lower() == "d":
-            self._seek(SEEK_SECONDS)
+            self._change_pitch(-PITCH_STEP)
         elif key.lower() == "z":
+            self._seek(-SEEK_SECONDS)
+        elif key.lower() == "x":
             self._seek(-NUDGE_SECONDS)
-        elif key.lower() == "v":
+        elif key.lower() == "c":
             self._seek(NUDGE_SECONDS)
+        elif key.lower() == "v":
+            self._seek(SEEK_SECONDS)
+        elif key.lower() == "m":
+            self._change_mode()
         elif key.lower() == "h":
             self._toggle_hold()
         elif key == "[":
