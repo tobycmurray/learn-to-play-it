@@ -1,5 +1,7 @@
 # Learn To Play It (ltpi)
 
+[![CI](https://github.com/tobycmurray/learn-to-play-it/actions/workflows/ci.yml/badge.svg)](https://github.com/tobycmurray/learn-to-play-it/actions/workflows/ci.yml)
+
 A CLI tool that helps musicians learn parts from recorded songs by:
 
 1. **Separating** a recording into individual instrument stems (vocals, drums, bass, other) using AI source separation
