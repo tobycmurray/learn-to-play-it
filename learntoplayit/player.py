@@ -24,6 +24,7 @@ HOLD_DURATION = 0.4
 
 BLOCK_SIZE = 1024
 RING_CAPACITY = 16384
+MODES = ["solo", "mute", "mix"]
 
 
 @dataclass
@@ -112,33 +113,59 @@ class Player:
 
         self._seek_requested = False
         self._feeder_stop = threading.Event()
-        self._feeder_pause = threading.Event()
+        self._feeder_paused = False
         self._feeder_thread = None
+
+    @property
+    def _playback_pos(self):
+        """Estimated position of audio currently being heard by the user.
+
+        The feeder runs ahead of playback — the ring buffer holds stretched
+        audio that hasn't reached the speakers yet. We subtract that to
+        approximate what's actually playing.
+        """
+        buffered_orig = int(self.ring.available() * self.speed)
+        return max(0, self.pos_orig - buffered_orig)
+
+    @property
+    def _time_ratio(self):
+        return 1.0 / self.speed
+
+    @property
+    def _pitch_scale(self):
+        return 2.0 ** (self.cents / 1200.0)
 
     def _make_stretcher(self):
         s = RubberBandStretcher(
             sample_rate=self.sr,
             channels=self.channels,
             options=Option.PROCESS_REALTIME | Option.ENGINE_FINER | Option.PitchHighConsistency,
-            initial_time_ratio=1.0 / self.speed,
-            initial_pitch_scale=2.0 ** (self.cents / 1200.0),
+            initial_time_ratio=self._time_ratio,
+            initial_pitch_scale=self._pitch_scale,
         )
         s.set_max_process_size(BLOCK_SIZE)
         return s
 
+    def _feeder_reset(self):
+        self.ring.flush()
+        self.stretcher = self._make_stretcher()
+
     def _feeder_loop(self):
         while not self._feeder_stop.is_set():
-            if self._feeder_pause.is_set():
+            if self._feeder_paused:
                 self._feeder_stop.wait(0.01)
                 continue
 
             if self._seek_requested:
-                self.ring.flush()
-                self.stretcher = self._make_stretcher()
+                self._feeder_reset()
                 self._seek_requested = False
 
-            self.stretcher.time_ratio = 1.0 / self.speed
-            self.stretcher.pitch_scale = 2.0 ** (self.cents / 1200.0)
+            if not self.playing:
+                self._feeder_stop.wait(0.01)
+                continue
+
+            self.stretcher.time_ratio = self._time_ratio
+            self.stretcher.pitch_scale = self._pitch_scale
 
             mix = self.mixes[self.mode]
             pos = self.pos_orig
@@ -148,34 +175,25 @@ class Player:
             if loop is not None and loop.active and loop.end_orig is not None:
                 end_pos = loop.end_orig
 
-            remaining = end_pos - pos
-            if remaining <= 0:
+            if pos >= end_pos:
                 if loop is not None and loop.active and loop.start_orig is not None:
                     self.pos_orig = loop.start_orig
                     continue
                 self._feeder_stop.wait(0.01)
                 continue
 
-            block_size = min(BLOCK_SIZE, remaining)
-
             if self.ring.free() < BLOCK_SIZE * 4:
                 self._feeder_stop.wait(0.005)
                 continue
 
+            block_size = min(BLOCK_SIZE, end_pos - pos)
             block = mix[pos:pos + block_size]
-            # pylibrb expects (channels, samples) layout
             self.stretcher.process(block.T, final=False)
             output = self.stretcher.retrieve_available()
             if output.shape[1] > 0:
                 self.ring.write(output.T)
 
             self.pos_orig = pos + block_size
-
-            if self.pos_orig >= end_pos:
-                if loop is not None and loop.active and loop.start_orig is not None:
-                    self.pos_orig = loop.start_orig
-                    self.ring.flush()
-                    self.stretcher = self._make_stretcher()
 
     def _callback(self, outdata, frames, time_info, status):
         if not self.playing:
@@ -215,7 +233,7 @@ class Player:
         return f"{int(m)}:{s:05.2f}"
 
     def _print_status(self):
-        original_secs = self.pos_orig / self.sr
+        original_secs = self._playback_pos / self.sr
         total_secs = self.song_len / self.sr
         if self.hold is not None:
             state = "⏺"
@@ -291,15 +309,14 @@ class Player:
         self._rebuild_hold_slice()
 
     def _change_mode(self):
-        modes = ["solo", "mute", "mix"]
-        idx = (modes.index(self.mode) + 1) % len(modes)
-        self.mode = modes[idx]
+        idx = (MODES.index(self.mode) + 1) % len(MODES)
+        self.mode = MODES[idx]
 
     def _seek(self, seconds):
         if self.hold is not None:
             return
         delta_orig = int(seconds * self.sr)
-        new_pos = self.pos_orig + delta_orig
+        new_pos = self._playback_pos + delta_orig
 
         loop = self.loop
         if loop is not None and loop.active and loop.end_orig is not None:
@@ -313,12 +330,12 @@ class Player:
     def _set_loop_start(self):
         if self.loop is None:
             self.loop = LoopRegion()
-        self.loop.set_start(self.pos_orig)
+        self.loop.set_start(self._playback_pos)
 
     def _set_loop_end(self):
         if self.loop is None:
             self.loop = LoopRegion()
-        self.loop.set_end(self.pos_orig)
+        self.loop.set_end(self._playback_pos)
 
     def _toggle_loop(self):
         loop = self.loop
@@ -326,7 +343,7 @@ class Player:
             return
         loop.active = not loop.active
         if loop.active:
-            if self.pos_orig >= loop.end_orig or self.pos_orig < loop.start_orig:
+            if self._playback_pos >= loop.end_orig or self._playback_pos < loop.start_orig:
                 self.pos_orig = loop.start_orig
                 self._seek_requested = True
 
@@ -348,13 +365,11 @@ class Player:
         if self.hold is not None:
             self.pos_orig = self.hold.end_orig
             self.hold = None
-            self._feeder_pause.clear()
+            self._feeder_paused = False
             self._seek_requested = True
         else:
-            buffered_orig = int(self.ring.available() * self.speed)
-            playback_pos = max(0, self.pos_orig - buffered_orig)
             hold_orig_samples = int(HOLD_DURATION * self.sr)
-            end = playback_pos
+            end = self._playback_pos
             start = max(0, end - hold_orig_samples)
             if end <= start:
                 return
@@ -363,7 +378,7 @@ class Player:
             if len(processed) == 0:
                 return
             self.hold = HoldState(start_orig=start, end_orig=end, raw=raw, slice=processed)
-            self._feeder_pause.set()
+            self._feeder_paused = True
 
     def _handle_key(self, key):
         if key == " ":
@@ -371,6 +386,8 @@ class Player:
         elif key.lower() == "q":
             self.quit = True
         elif key == "0":
+            if self.hold is not None:
+                return
             loop = self.loop
             if loop is not None and loop.active:
                 self.pos_orig = loop.start_orig
