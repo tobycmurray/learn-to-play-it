@@ -16,14 +16,35 @@ PITCH_STEP = 10
 PITCH_MIN = -200
 PITCH_MAX = 200
 SEEK_SECONDS = 5
+NUDGE_SECONDS = 0.05
 HOLD_DURATION = 0.2
 
 
 @dataclass
 class LoopRegion:
-    start_orig: int
+    start_orig: int | None = None
     end_orig: int | None = None
     active: bool = False
+
+    def set_start(self, pos: int):
+        self.start_orig = pos
+        self._enforce()
+
+    def set_end(self, pos: int):
+        self.end_orig = pos
+        self._enforce()
+
+    def _enforce(self):
+        """Ensure start < end. If not, clear the violated bound and deactivate."""
+        if self.start_orig is not None and self.end_orig is not None:
+            if self.start_orig >= self.end_orig:
+                self.end_orig = None
+                self.active = False
+        if self.start_orig is None or self.end_orig is None:
+            self.active = False
+
+    def is_complete(self) -> bool:
+        return self.start_orig is not None and self.end_orig is not None
 
 
 @dataclass
@@ -149,15 +170,15 @@ class Player:
         cents_str = f"{self.cents:+.0f}" if self.cents != 0 else "0"
 
         loop = self.loop
-        if loop is not None:
-            ls_str = f"{loop.start_orig / self.sr:.1f}s"
-            le_str = f"{loop.end_orig / self.sr:.1f}s" if loop.end_orig is not None else "?"
+        if loop is not None and (loop.start_orig is not None or loop.end_orig is not None):
+            ls_str = f"{loop.start_orig / self.sr:.2f}s" if loop.start_orig is not None else "?"
+            le_str = f"{loop.end_orig / self.sr:.2f}s" if loop.end_orig is not None else "?"
             loop_str = f"loop: {'ON' if loop.active else 'OFF'} {ls_str}-{le_str}"
         else:
             loop_str = "loop: OFF"
 
         print(
-            f"\r  {state} {original_secs:5.1f}s / {total_secs:.1f}s  |  "
+            f"\r  {state} {original_secs:5.2f}s / {total_secs:.2f}s  |  "
             f"speed: {speed_pct}%  |  pitch: {cents_str}c  |  "
             f"{loop_str}  |  "
             f"mode: {self.mode}  |  part: {self.part}     ",
@@ -166,8 +187,8 @@ class Player:
 
     def run(self):
         print(f"Playing: {self.part} ({self.mode})")
-        print("Controls: SPACE=play/pause  W/X=speed  E/C=pitch  A/D=seek  H=hold")
-        print("          [=loop point  L=loop  S=mode  0=restart  Q=quit")
+        print("Controls: SPACE=play/pause  W/X=speed  E/C=pitch  A/D=seek  Z/V=nudge  H=hold")
+        print("          [/]=loop start/end  L=loop  S=mode  0=restart  Q=quit")
         print()
 
         self.stream = sd.OutputStream(
@@ -242,26 +263,23 @@ class Player:
 
         self.pos_orig = new_pos
 
-    def _set_loop_point(self):
-        current = self.pos_orig
-        if self.loop is None or self.loop.end_orig is not None:
-            self.loop = LoopRegion(start_orig=current)
-        else:
-            if current > self.loop.start_orig:
-                self.loop.end_orig = current
-            else:
-                self.loop = LoopRegion(start_orig=current)
+    def _set_loop_start(self):
+        if self.loop is None:
+            self.loop = LoopRegion()
+        self.loop.set_start(self.pos_orig)
+
+    def _set_loop_end(self):
+        if self.loop is None:
+            self.loop = LoopRegion()
+        self.loop.set_end(self.pos_orig)
 
     def _toggle_loop(self):
         loop = self.loop
-        if loop is None or loop.end_orig is None:
+        if loop is None or not loop.is_complete():
             return
         loop.active = not loop.active
         if loop.active:
-            buf_pos = self._buf_pos()
-            loop_start_buf = self._buf_pos(loop.start_orig)
-            loop_end_buf = self._buf_pos(loop.end_orig)
-            if buf_pos >= loop_end_buf or buf_pos < loop_start_buf:
+            if self.pos_orig >= loop.end_orig or self.pos_orig < loop.start_orig:
                 self.pos_orig = loop.start_orig
 
     def _toggle_hold(self):
@@ -290,7 +308,6 @@ class Player:
                 self.pos_orig = loop.start_orig
             else:
                 self.pos_orig = 0
-            self.playing = True
         elif key.lower() == "s":
             self._change_mode()
         elif key.lower() == "w":
@@ -305,10 +322,16 @@ class Player:
             self._seek(-SEEK_SECONDS)
         elif key.lower() == "d":
             self._seek(SEEK_SECONDS)
+        elif key.lower() == "z":
+            self._seek(-NUDGE_SECONDS)
+        elif key.lower() == "v":
+            self._seek(NUDGE_SECONDS)
         elif key.lower() == "h":
             self._toggle_hold()
         elif key == "[":
-            self._set_loop_point()
+            self._set_loop_start()
+        elif key == "]":
+            self._set_loop_end()
         elif key.lower() == "l":
             self._toggle_loop()
 
