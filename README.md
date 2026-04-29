@@ -56,6 +56,30 @@ Opens an interactive playback session with the bass part isolated, starting at 5
 | `0`     | Restart (or loop start if looping)    |
 | `Q`     | Quit                                  |
 
+
+These keys follow a visual layout, shown below:
+```
+  +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
+  |  Q  |  W  |  E  |     |     |     |     |     |     |     |  [  |  ]  |
+  |     |     |     |     |     |     |     |     |     |     |     |     |
+  |quit |speed|pitch|     |     |     |     |     |     |     |loop |loop |
+  |     | up  | up  |     |     |     |     |     |     |     |start| end |
+  +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
+  |     |  S  |  D  |     |     |  H  |     |     |  L  |     |     |     |
+  |     |     |     |     |     |     |     |     |loop |     |     |     |
+  |     |speed|pitch|     |     |hold |     |     |on / |     |     |     |
+  |     |down |down |     |     |note |     |     |off  |     |     |     |
+  +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
+  |  Z  |  X  |  C  |  V  |     |     |  M  |     |     |     |     |     |
+  |skip |nudge|nudge|skip |     |     |     |     |     |     |     |     |
+  |back |back | fwd | fwd |     |     |cycle|     |     |     |     |     |
+  | <<  |  <  |  >  | >>  |     |     |mode |     |     |     |     |     |
+  +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
+
+                SPACE = play/pause    0 = restart
+
+```
+
 **Modes** (cycled with `M`):
 - **solo** — hear only the selected part
 - **mute** — hear everything *except* the selected part (play-along)
