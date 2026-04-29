@@ -157,6 +157,11 @@ class Player:
                 self.pos_orig = self._orig_pos(limit)
                 self.playing = False
 
+    @staticmethod
+    def _fmt_time(secs):
+        m, s = divmod(secs, 60)
+        return f"{int(m)}:{s:05.2f}"
+
     def _print_status(self):
         original_secs = self.pos_orig / self.sr
         total_secs = len(list(self.stems.values())[0]) / self.sr
@@ -171,14 +176,16 @@ class Player:
 
         loop = self.loop
         if loop is not None and (loop.start_orig is not None or loop.end_orig is not None):
-            ls_str = f"{loop.start_orig / self.sr:.2f}s" if loop.start_orig is not None else "?"
-            le_str = f"{loop.end_orig / self.sr:.2f}s" if loop.end_orig is not None else "?"
+            ls_str = self._fmt_time(loop.start_orig / self.sr) if loop.start_orig is not None else "?"
+            le_str = self._fmt_time(loop.end_orig / self.sr) if loop.end_orig is not None else "?"
             loop_str = f"loop: {'ON' if loop.active else 'OFF'} {ls_str}-{le_str}"
         else:
             loop_str = "loop: OFF"
 
+        pos_str = self._fmt_time(original_secs)
+        tot_str = self._fmt_time(total_secs)
         print(
-            f"\r  {state} {original_secs:5.2f}s / {total_secs:.2f}s  |  "
+            f"\r  {state} {pos_str} / {tot_str}  |  "
             f"speed: {speed_pct}%  |  pitch: {cents_str}c  |  "
             f"{loop_str}  |  "
             f"mode: {self.mode}  |  part: {self.part}     ",
