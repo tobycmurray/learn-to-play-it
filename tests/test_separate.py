@@ -43,3 +43,22 @@ def test_parts_command(synthetic_wav):
     assert result.exit_code == 0
     for name in STEM_NAMES:
         assert name in result.output
+
+
+def test_clean_command(synthetic_wav):
+    from click.testing import CliRunner
+    from learntoplayit.cli import main
+    from learntoplayit.separate import get_stems_dir, stems_exist
+
+    stems_dir = get_stems_dir(str(synthetic_wav))
+    assert stems_dir.exists()
+
+    runner = CliRunner()
+    result = runner.invoke(main, ["clean", str(synthetic_wav)])
+    assert result.exit_code == 0
+    assert "Deleted" in result.output
+    assert not stems_dir.exists()
+
+    result = runner.invoke(main, ["clean", str(synthetic_wav)])
+    assert result.exit_code == 0
+    assert "No stems found" in result.output

@@ -57,6 +57,21 @@ def practice(audio_file, part, speed, pitch):
     play_interactive(stems_dir, part, initial_mode="solo", initial_speed=speed / 100, initial_cents=pitch)
 
 
+@main.command()
+@click.argument("audio_file", type=click.Path(exists=True))
+def clean(audio_file):
+    """Delete cached stems for a song."""
+    import shutil
+    from .separate import get_stems_dir
+
+    stems_dir = get_stems_dir(audio_file)
+    if stems_dir.exists():
+        shutil.rmtree(stems_dir)
+        click.echo(f"Deleted stems for {audio_file}")
+    else:
+        click.echo(f"No stems found for {audio_file}")
+
+
 @main.command("play-along")
 @click.argument("audio_file", type=click.Path(exists=True))
 @click.argument("part", type=click.Choice(["vocals", "drums", "bass", "guitar", "piano", "other"]))
