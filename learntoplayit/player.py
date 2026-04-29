@@ -1,6 +1,8 @@
 import sys
 import tty
 import termios
+import select
+from dataclasses import dataclass
 
 import numpy as np
 import sounddevice as sd
@@ -17,18 +19,47 @@ SEEK_SECONDS = 5
 HOLD_DURATION = 0.2
 
 
-def _read_key():
+@dataclass
+class LoopRegion:
+    start_orig: int
+    end_orig: int | None = None
+    active: bool = False
+
+
+@dataclass
+class HoldState:
+    start_orig: int
+    end_orig: int
+    slice: np.ndarray
+    pos: int = 0
+
+
+def _read_key(timeout=0.1):
+    """Read a single keypress, or return None after timeout."""
     fd = sys.stdin.fileno()
     old = termios.tcgetattr(fd)
     try:
         tty.setraw(fd)
-        ch = sys.stdin.read(1)
+        if select.select([sys.stdin], [], [], timeout)[0]:
+            return sys.stdin.read(1)
+        return None
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old)
-    return ch
 
 
 class Player:
+    """Interactive audio player with speed/pitch/loop/hold controls.
+
+    Position tracking: all position state is stored in original-song sample
+    units (self.pos_orig). Buffer indices are derived on the fly via
+    _buf_pos(). This avoids dual-position sync bugs when speed changes.
+
+    Threading: the sounddevice callback runs on a separate thread and reads
+    self.playing, self.pos_orig, self.audio, self.hold. The GIL protects
+    against torn object reads. We set self.playing=False before mutating
+    shared arrays so the callback outputs silence during rebuilds.
+    """
+
     def __init__(self, stems_dir, part, initial_mode="solo", initial_speed=0.5):
         self.stems, self.sr = load_all_stems(stems_dir)
         self.part = part
@@ -36,86 +67,79 @@ class Player:
         self.speed = initial_speed
         self.cents = 0.0
 
-        self.raw_audio = mix_stems(self.stems, self.mode, self.part)
-        self._rebuild_audio()
-        self.original_pos = 0.0
-        self.pos = 0
+        self.audio = None
+        self._rebuild()
+
+        self.pos_orig = 0
         self.playing = False
         self.quit = False
         self.stream = None
 
-        # Loop points in original-song sample positions (speed-independent)
-        self.loop_start_orig = None
-        self.loop_end_orig = None
-        self.looping = False
+        self.loop: LoopRegion | None = None
+        self.hold: HoldState | None = None
 
-        # Hold state — positions stored in original-song samples
-        self.holding = False
-        self.hold_slice = None
-        self.hold_pos = 0
-        self.hold_start_orig = 0
-        self.hold_end_orig = 0
+    def _rebuild(self):
+        """Recompute the stretched/shifted audio buffer from sources of truth."""
+        raw = mix_stems(self.stems, self.mode, self.part)
+        self.audio = process_audio(raw, self.sr, self.speed, self.cents)
 
-    def _rebuild_audio(self):
-        self.audio = process_audio(self.raw_audio, self.sr, self.speed, self.cents)
+    def _buf_pos(self, orig_pos: int | None = None) -> int:
+        """Convert original-song sample position to buffer index."""
+        if orig_pos is None:
+            orig_pos = self.pos_orig
+        return int(orig_pos / self.speed)
 
-    def _original_pos_from_buffer(self):
-        return self.pos * self.speed
+    def _orig_pos(self, buf_pos: int) -> int:
+        """Convert buffer index to original-song sample position."""
+        return int(buf_pos * self.speed)
 
-    def _buffer_pos_from_original(self):
-        return int(self.original_pos / self.speed)
-
-    def _loop_end_buffer(self):
-        if self.loop_end_orig is None:
-            return None
-        return int(self.loop_end_orig / self.speed)
-
-    def _loop_start_buffer(self):
-        if self.loop_start_orig is None:
-            return None
-        return int(self.loop_start_orig / self.speed)
+    def _buf_len(self) -> int:
+        return len(self.audio)
 
     def _callback(self, outdata, frames, time_info, status):
         if not self.playing:
             outdata[:] = 0
             return
 
-        if self.holding and self.hold_slice is not None:
-            hold_len = len(self.hold_slice)
+        hold = self.hold
+        if hold is not None:
+            hold_len = len(hold.slice)
             written = 0
             while written < frames:
-                chunk = min(frames - written, hold_len - self.hold_pos)
-                outdata[written:written + chunk] = self.hold_slice[self.hold_pos:self.hold_pos + chunk]
-                self.hold_pos = (self.hold_pos + chunk) % hold_len
+                chunk = min(frames - written, hold_len - hold.pos)
+                outdata[written:written + chunk] = hold.slice[hold.pos:hold.pos + chunk]
+                hold.pos = (hold.pos + chunk) % hold_len
                 written += chunk
             return
 
-        limit = len(self.audio)
-        loop_end = self._loop_end_buffer()
-        if self.looping and loop_end is not None:
-            limit = min(limit, loop_end)
+        buf_pos = self._buf_pos()
+        limit = self._buf_len()
 
-        end = self.pos + frames
+        loop = self.loop
+        if loop is not None and loop.active and loop.end_orig is not None:
+            loop_end_buf = self._buf_pos(loop.end_orig)
+            limit = min(limit, loop_end_buf)
+
+        end = buf_pos + frames
         if end <= limit:
-            outdata[:] = self.audio[self.pos:end]
-            self.pos = end
+            outdata[:] = self.audio[buf_pos:end]
+            self.pos_orig = self._orig_pos(end)
         else:
-            valid = limit - self.pos
+            valid = limit - buf_pos
             if valid > 0:
-                outdata[:valid] = self.audio[self.pos:self.pos + valid]
+                outdata[:valid] = self.audio[buf_pos:buf_pos + valid]
             outdata[max(0, valid):] = 0
 
-            if self.looping and loop_end is not None:
-                loop_start = self._loop_start_buffer() or 0
-                self.pos = loop_start
+            if loop is not None and loop.active and loop.end_orig is not None:
+                self.pos_orig = loop.start_orig
             else:
-                self.pos = limit
+                self.pos_orig = self._orig_pos(limit)
                 self.playing = False
 
     def _print_status(self):
-        original_secs = self._original_pos_from_buffer() / self.sr
-        total_secs = len(self.raw_audio) / self.sr
-        if self.holding:
+        original_secs = self.pos_orig / self.sr
+        total_secs = len(list(self.stems.values())[0]) / self.sr
+        if self.hold is not None:
             state = "⏺"
         elif self.playing:
             state = "▶"
@@ -123,12 +147,15 @@ class Player:
             state = "⏸"
         speed_pct = int(round(self.speed * 100))
         cents_str = f"{self.cents:+.0f}" if self.cents != 0 else "0"
-        ls_str = f"{self.loop_start_orig / self.sr:.1f}s" if self.loop_start_orig is not None else "none"
-        le_str = f"{self.loop_end_orig / self.sr:.1f}s" if self.loop_end_orig is not None else "none"
-        if self.looping:
-            loop_str = f"loop: ON {ls_str}-{le_str}"
+
+        loop = self.loop
+        if loop is not None:
+            ls_str = f"{loop.start_orig / self.sr:.1f}s"
+            le_str = f"{loop.end_orig / self.sr:.1f}s" if loop.end_orig is not None else "?"
+            loop_str = f"loop: {'ON' if loop.active else 'OFF'} {ls_str}-{le_str}"
         else:
-            loop_str = f"loop: OFF {ls_str}-{le_str}"
+            loop_str = "loop: OFF"
+
         print(
             f"\r  {state} {original_secs:5.1f}s / {total_secs:.1f}s  |  "
             f"speed: {speed_pct}%  |  pitch: {cents_str}c  |  "
@@ -145,7 +172,7 @@ class Player:
 
         self.stream = sd.OutputStream(
             samplerate=self.sr,
-            channels=self.raw_audio.shape[1] if self.raw_audio.ndim > 1 else 1,
+            channels=self.audio.shape[1] if self.audio.ndim > 1 else 1,
             callback=self._callback,
             blocksize=2048,
         )
@@ -156,105 +183,101 @@ class Player:
             while not self.quit:
                 self._print_status()
                 key = _read_key()
-                self._handle_key(key)
+                if key is not None:
+                    self._handle_key(key)
         finally:
             self.stream.stop()
             self.stream.close()
             print()
 
-    def _rebuild_at_position(self):
+    def _pause_rebuild_resume(self, reason="processing"):
+        """Pause playback, rebuild audio buffer, rebuild hold if active, resume."""
         was_playing = self.playing
         self.playing = False
-        self._rebuild_audio()
-        self.pos = min(self._buffer_pos_from_original(), max(0, len(self.audio) - 1))
-        if self.holding:
+        print(f"\r  ({reason}...){'':40}", end="", flush=True)
+        self._rebuild()
+        if self.hold is not None:
             self._rebuild_hold_slice()
         self.playing = was_playing
+
+    def _rebuild_hold_slice(self):
+        hold = self.hold
+        if hold is None:
+            return
+        buf_start = self._buf_pos(hold.start_orig)
+        buf_end = self._buf_pos(hold.end_orig)
+        hold.slice = self.audio[buf_start:buf_end].copy()
+        hold.pos = 0
 
     def _change_speed(self, delta):
         new_speed = round(min(SPEED_MAX, max(SPEED_MIN, self.speed + delta)), 2)
         if new_speed == self.speed:
             return
-        self.original_pos = self._original_pos_from_buffer()
         self.speed = new_speed
-        self._rebuild_at_position()
+        self._pause_rebuild_resume("stretching")
 
     def _change_pitch(self, delta):
         new_cents = min(PITCH_MAX, max(PITCH_MIN, self.cents + delta))
         if new_cents == self.cents:
             return
-        self.original_pos = self._original_pos_from_buffer()
         self.cents = new_cents
-        self._rebuild_at_position()
+        self._pause_rebuild_resume("pitch-shifting")
 
     def _change_mode(self):
         modes = ["solo", "mute", "mix"]
         idx = (modes.index(self.mode) + 1) % len(modes)
         self.mode = modes[idx]
-        self.original_pos = self._original_pos_from_buffer()
-        self.raw_audio = mix_stems(self.stems, self.mode, self.part)
-        self._rebuild_at_position()
+        self._pause_rebuild_resume("switching mode")
 
     def _seek(self, seconds):
-        # Work in buffer positions; clamp to loop region if looping
-        delta = int(seconds * self.sr / self.speed)
-        new_pos = self.pos + delta
+        delta_orig = int(seconds * self.sr)
+        new_pos = self.pos_orig + delta_orig
 
-        if self.looping and self.loop_start_orig is not None and self.loop_end_orig is not None:
-            lo = self._loop_start_buffer() or 0
-            hi = self._loop_end_buffer()
-            new_pos = max(lo, min(new_pos, hi - 1))
+        loop = self.loop
+        if loop is not None and loop.active and loop.end_orig is not None:
+            new_pos = max(loop.start_orig, min(new_pos, loop.end_orig - 1))
         else:
-            new_pos = max(0, min(new_pos, len(self.audio) - 1))
+            max_orig = self._orig_pos(self._buf_len() - 1)
+            new_pos = max(0, min(new_pos, max_orig))
 
-        self.pos = new_pos
+        self.pos_orig = new_pos
 
     def _set_loop_point(self):
-        current = int(self._original_pos_from_buffer())
-        if self.loop_start_orig is None or self.loop_end_orig is not None:
-            # Starting fresh: clear old points, set start
-            self.looping = False
-            self.loop_start_orig = current
-            self.loop_end_orig = None
+        current = self.pos_orig
+        if self.loop is None or self.loop.end_orig is not None:
+            self.loop = LoopRegion(start_orig=current)
         else:
-            # Start is set, end is not: set end
-            if current > self.loop_start_orig:
-                self.loop_end_orig = current
+            if current > self.loop.start_orig:
+                self.loop.end_orig = current
             else:
-                # End before start: treat as new start
-                self.loop_start_orig = current
-                self.loop_end_orig = None
-
-    def _toggle_hold(self):
-        if self.holding:
-            self.holding = False
-            self.hold_slice = None
-            self.pos = int(self.hold_end_orig / self.speed)
-        else:
-            hold_orig_samples = int(HOLD_DURATION * self.sr)
-            current_orig = int(self._original_pos_from_buffer())
-            self.hold_start_orig = max(0, current_orig - hold_orig_samples)
-            self.hold_end_orig = current_orig
-            self._rebuild_hold_slice()
-            if len(self.hold_slice) == 0:
-                return
-            self.holding = True
-
-    def _rebuild_hold_slice(self):
-        buf_start = int(self.hold_start_orig / self.speed)
-        buf_end = int(self.hold_end_orig / self.speed)
-        self.hold_slice = self.audio[buf_start:buf_end].copy()
-        self.hold_pos = 0
+                self.loop = LoopRegion(start_orig=current)
 
     def _toggle_loop(self):
-        if self.loop_start_orig is None or self.loop_end_orig is None:
+        loop = self.loop
+        if loop is None or loop.end_orig is None:
             return
-        self.looping = not self.looping
-        if self.looping:
-            loop_start = self._loop_start_buffer() or 0
-            loop_end = self._loop_end_buffer()
-            if self.pos >= loop_end or self.pos < loop_start:
-                self.pos = loop_start
+        loop.active = not loop.active
+        if loop.active:
+            buf_pos = self._buf_pos()
+            loop_start_buf = self._buf_pos(loop.start_orig)
+            loop_end_buf = self._buf_pos(loop.end_orig)
+            if buf_pos >= loop_end_buf or buf_pos < loop_start_buf:
+                self.pos_orig = loop.start_orig
+
+    def _toggle_hold(self):
+        if self.hold is not None:
+            self.pos_orig = self.hold.end_orig
+            self.hold = None
+        else:
+            hold_orig_samples = int(HOLD_DURATION * self.sr)
+            start = max(0, self.pos_orig - hold_orig_samples)
+            end = self.pos_orig
+            buf_start = self._buf_pos(start)
+            buf_end = self._buf_pos(end)
+            slice_data = self.audio[buf_start:buf_end].copy()
+            if len(slice_data) == 0:
+                return
+            self.hold = HoldState(start_orig=start, end_orig=end, slice=slice_data)
 
     def _handle_key(self, key):
         if key == " ":
@@ -262,8 +285,11 @@ class Player:
         elif key.lower() == "q":
             self.quit = True
         elif key == "0":
-            self.pos = 0
-            self.original_pos = 0.0
+            loop = self.loop
+            if loop is not None and loop.active:
+                self.pos_orig = loop.start_orig
+            else:
+                self.pos_orig = 0
             self.playing = True
         elif key.lower() == "s":
             self._change_mode()
