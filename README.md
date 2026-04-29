@@ -105,6 +105,22 @@ ltpi parts song.mp3
 
 Shows which stems are available after separation.
 
+### Delete cached stems
+
+```bash
+ltpi clean song.mp3
+```
+
+Removes the cached stems for a song, freeing disk space.
+
+### Global options
+
+```bash
+ltpi --stems-dir /path/to/cache practice song.mp3 guitar
+```
+
+Use `--stems-dir` to store stems in a custom location (default: `./stems`).
+
 ## How it works
 
 - **Source separation**: [Demucs](https://github.com/adefossez/demucs) (Meta Research) splits audio into six stems: vocals, drums, bass, guitar, piano, and other

@@ -8,13 +8,13 @@ Unless otherwise noted, start each section from a fresh launch.
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 1.1 | Launch | Audio plays immediately. Status shows `▶`, position advances, speed 50%, pitch 0c, loop OFF, mode solo, part guitar |
+| 1.1 | Launch | Audio plays immediately. Status shows `▶`, position advances in M:SS.ss format, speed 50%, pitch 0c, loop OFF, mode solo, part guitar |
 | 1.2 | Press SPACE | Audio pauses. Status shows `⏸`. Position stops advancing |
 | 1.3 | Press SPACE | Audio resumes from where it paused |
 | 1.4 | Let it play to the end | Audio stops. Status shows `⏸` at final position |
-| 1.5 | Press 0 while paused | Position resets to 0.0s. Stays paused |
+| 1.5 | Press 0 while paused | Position resets to 0:00.00. Stays paused |
 | 1.6 | Press SPACE | Audio plays from beginning |
-| 1.7 | Press 0 while playing | Position resets to 0.0s. Continues playing |
+| 1.7 | Press 0 while playing | Position resets to 0:00.00. Continues playing |
 | 1.8 | Press Q | Player exits cleanly, terminal restored to normal |
 
 ## 2. Speed control
@@ -44,11 +44,11 @@ Unless otherwise noted, start each section from a fresh launch.
 | 4.1 | Press V | Position jumps forward ~5s |
 | 4.2 | Press V repeatedly | Position continues advancing 5s per press |
 | 4.3 | Press Z | Position jumps back ~5s |
-| 4.4 | Press Z at position < 5s | Position clamps to 0.0s, doesn't go negative |
+| 4.4 | Press Z at position < 5s | Position clamps to 0:00.00, doesn't go negative |
 | 4.5 | Press V near end of track | Position clamps to end, doesn't overflow |
 | 4.6 | Press SPACE to pause, then C | Position advances 0.05s (fine nudge forward) |
 | 4.7 | Press X | Position goes back 0.05s (fine nudge backward) |
-| 4.8 | Press X at position 0.0s | Position stays at 0.0s, doesn't go negative |
+| 4.8 | Press X at position 0:00.00 | Position stays at 0:00.00, doesn't go negative |
 
 ## 5. Mode cycling
 
@@ -64,14 +64,14 @@ Unless otherwise noted, start each section from a fresh launch.
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 6.1 | Play until ~20s, press [ | Status shows `loop: OFF 20.0s-?` (approx) |
-| 6.2 | Play until ~30s, press ] | Status shows `loop: OFF 20.0s-30.0s` (approx) |
+| 6.1 | Play until ~20s, press [ | Status shows `loop: OFF 0:20.00-?` (approx) |
+| 6.2 | Play until ~30s, press ] | Status shows `loop: OFF 0:20.00-0:30.00` (approx) |
 | 6.3 | Press L | Status shows `loop: ON`. If position was past 30s, jumps back to 20s |
 | 6.4 | Let it play | Audio loops between 20s and 30s repeatedly |
 | 6.5 | Press L | Status shows `loop: OFF`. Audio continues past 30s normally |
 | 6.6 | Press L again | Loop re-enabled, jumps back into region if needed |
-| 6.7 | Press [ at 50s | Loop start moved to 50s. End cleared (was 30s < 50s). Loop deactivated. Status shows `loop: OFF 50.0s-?` |
-| 6.8 | Press ] at 40s (before start) | End set to 40s but < start (50s), so start cleared. Status shows `loop: OFF ?-40.0s` |
+| 6.7 | Press [ at 50s | Loop start moved to 50s. End cleared (was 30s < 50s). Loop deactivated. Status shows `loop: OFF 0:50.00-?` |
+| 6.8 | Press ] at 40s (before start) | End set to 40s but < start (50s), so start cleared. Status shows `loop: OFF ?-0:40.00` |
 
 ## 7. Loop + seek/nudge interaction
 
@@ -83,7 +83,7 @@ Unless otherwise noted, start each section from a fresh launch.
 | 7.4 | Press V at loop end | Position stays at ~30s, doesn't exceed |
 | 7.5 | Press X/C | Fine nudge also clamped within loop region |
 | 7.6 | Press 0 while loop is active | Position jumps to loop start (20s), not song start |
-| 7.7 | Press L to disable loop, then press 0 | Position jumps to song start (0.0s) |
+| 7.7 | Press L to disable loop, then press 0 | Position jumps to song start (0:00.00) |
 
 ## 8. Loop + speed interaction
 
@@ -124,17 +124,30 @@ Launch with: `ltpi play-along /tmp/safm.mp3 guitar`
 | 11.1 | Launch | Audio plays at 100% speed in mute mode (everything except guitar). Status shows speed 100%, mode mute |
 | 11.2 | All other controls | Work the same as in practice mode |
 
-## 12. Separation and caching
+## 12. CLI options
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 12.1 | `ltpi separate /tmp/safm.mp3` (already separated) | Prints "Stems already exist", lists 6 stems |
-| 12.2 | `ltpi parts /tmp/safm.mp3` | Lists: vocals, drums, bass, guitar, piano, other |
-| 12.3 | `rm -rf stems/safm && ltpi practice /tmp/safm.mp3 bass` | Auto-separates (takes a few minutes), then enters player |
+| 12.1 | `ltpi practice /tmp/safm.mp3 guitar --speed 70` | Starts at 70% speed |
+| 12.2 | `ltpi practice /tmp/safm.mp3 guitar --pitch -50` | Starts at -50c pitch |
+| 12.3 | `ltpi practice /tmp/safm.mp3 guitar --speed 10` | Error: speed must be between 20 and 150 |
+| 12.4 | `ltpi practice /tmp/safm.mp3 guitar --pitch 300` | Error: pitch must be between -200 and 200 |
 
-## 13. Error cases
+## 13. Separation and caching
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 13.1 | `ltpi separate nonexistent.mp3` | Error message about file not found (from Click) |
-| 13.2 | `ltpi practice /tmp/safm.mp3 banjo` | Error message about invalid choice (from Click) |
+| 13.1 | `ltpi separate /tmp/safm.mp3` (already separated) | Prints "Stems already exist", lists 6 stems |
+| 13.2 | `ltpi parts /tmp/safm.mp3` | Lists: vocals, drums, bass, guitar, piano, other |
+| 13.3 | `ltpi clean /tmp/safm.mp3` | Prints "Deleted stems for /tmp/safm.mp3" |
+| 13.4 | `ltpi clean /tmp/safm.mp3` (again) | Prints "No stems found for /tmp/safm.mp3" |
+| 13.5 | `ltpi practice /tmp/safm.mp3 bass` | Auto-separates (takes a few minutes), then enters player |
+| 13.6 | Copy safm.mp3 to /tmp/copy.mp3, run `ltpi parts /tmp/copy.mp3` | Finds existing stems (same hash) |
+
+## 14. Error cases
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 14.1 | `ltpi separate nonexistent.mp3` | Error message about file not found (from Click) |
+| 14.2 | `ltpi practice /tmp/safm.mp3 banjo` | Error message about invalid choice (from Click) |
+| 14.3 | Uninstall ffmpeg, run any command | Error: missing required tools, lists ffmpeg with install hint |
