@@ -42,8 +42,5 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[test]"
 
-      - name: Run smoke tests
-        run: pytest tests/test_smoke.py -v
-
-      - name: Run separation and audio tests
-        run: pytest tests/test_separate.py tests/test_audio.py -v --timeout=300
+      - name: Run tests
+        run: pytest tests/ -v --timeout=300
