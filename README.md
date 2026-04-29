@@ -40,9 +40,10 @@ Runs AI source separation (Demucs) to produce individual stems. This takes a few
 
 ```bash
 ltpi practice song.mp3 bass
+ltpi practice song.mp3 bass --speed 70 --pitch -50
 ```
 
-Opens an interactive playback session with the bass part isolated, starting at 50% speed. Use keyboard controls to adjust:
+Opens an interactive playback session with the bass part isolated, starting at 50% speed (or the speed/pitch you specify). Use keyboard controls to adjust:
 
 | Key     | Action                                |
 |---------|---------------------------------------|
@@ -91,9 +92,10 @@ These keys follow a visual layout, shown below:
 
 ```bash
 ltpi play-along song.mp3 bass
+ltpi play-along song.mp3 bass --speed 80
 ```
 
-Shortcut that opens the same interactive session but starts in **mute** mode at **100% speed** — everything except your part, at full tempo.
+Shortcut that opens the same interactive session but starts in **mute** mode at **100% speed** — everything except your part, at full tempo. Use `--speed` and `--pitch` to override the defaults.
 
 ### List available parts
 
@@ -112,7 +114,7 @@ Shows which stems are available after separation.
 
 ## Stem cache
 
-Separated stems are stored under `stems/<song-name>/` and reused across sessions. Re-running `separate` on an already-processed song is a no-op.
+Separated stems are cached under `stems/<sha256-hash>/` based on the audio file's contents. This means renaming or moving the file won't trigger re-separation, and identical copies of the same file share stems. Re-running `separate` on an already-processed song is a no-op.
 
 ## Getting audio from YouTube
 

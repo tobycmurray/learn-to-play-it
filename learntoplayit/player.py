@@ -81,12 +81,12 @@ class Player:
     shared arrays so the callback outputs silence during rebuilds.
     """
 
-    def __init__(self, stems_dir, part, initial_mode="solo", initial_speed=0.5):
+    def __init__(self, stems_dir, part, initial_mode="solo", initial_speed=0.5, initial_cents=0.0):
         self.stems, self.sr = load_all_stems(stems_dir)
         self.part = part
         self.mode = initial_mode
         self.speed = initial_speed
-        self.cents = 0.0
+        self.cents = initial_cents
 
         self.audio = None
         self._rebuild()
@@ -336,6 +336,6 @@ class Player:
             self._toggle_loop()
 
 
-def play_interactive(stems_dir, part, initial_mode="solo", initial_speed=0.5):
-    player = Player(stems_dir, part, initial_mode, initial_speed)
+def play_interactive(stems_dir, part, initial_mode="solo", initial_speed=0.5, initial_cents=0.0):
+    player = Player(stems_dir, part, initial_mode, initial_speed, initial_cents)
     player.run()

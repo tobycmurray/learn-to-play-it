@@ -46,22 +46,26 @@ def parts(audio_file):
 @main.command()
 @click.argument("audio_file", type=click.Path(exists=True))
 @click.argument("part", type=click.Choice(["vocals", "drums", "bass", "guitar", "piano", "other"]))
-def practice(audio_file, part):
+@click.option("--speed", type=int, default=50, help="Initial speed as percentage (default: 50)")
+@click.option("--pitch", type=int, default=0, help="Initial pitch shift in cents (default: 0)")
+def practice(audio_file, part, speed, pitch):
     """Practice a part: isolated, starting at 50% speed."""
     from .separate import ensure_stems
     from .player import play_interactive
 
     stems_dir = ensure_stems(audio_file)
-    play_interactive(stems_dir, part, initial_mode="solo", initial_speed=0.5)
+    play_interactive(stems_dir, part, initial_mode="solo", initial_speed=speed / 100, initial_cents=pitch)
 
 
 @main.command("play-along")
 @click.argument("audio_file", type=click.Path(exists=True))
 @click.argument("part", type=click.Choice(["vocals", "drums", "bass", "guitar", "piano", "other"]))
-def play_along(audio_file, part):
+@click.option("--speed", type=int, default=100, help="Initial speed as percentage (default: 100)")
+@click.option("--pitch", type=int, default=0, help="Initial pitch shift in cents (default: 0)")
+def play_along(audio_file, part, speed, pitch):
     """Play along with the song, your part removed."""
     from .separate import ensure_stems
     from .player import play_interactive
 
     stems_dir = ensure_stems(audio_file)
-    play_interactive(stems_dir, part, initial_mode="mute", initial_speed=1.0)
+    play_interactive(stems_dir, part, initial_mode="mute", initial_speed=speed / 100, initial_cents=pitch)

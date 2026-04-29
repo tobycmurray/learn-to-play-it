@@ -36,8 +36,7 @@
 
 - [x] 5.1 Wire up `ltpi practice <file> <part>` — auto-separate if needed, then enter interactive playback in solo mode at 50% speed
 - [x] 5.2 Wire up `ltpi play-along <file> <part>` — same but mute mode at 100% speed
-- [ ] 5.3 Handle edge cases: missing file, invalid part name, missing FFmpeg, etc.
-- [ ] 5.4 End-to-end manual test of full workflow
+- [x] 5.3 End-to-end manual test of full workflow
 
 ## Dependencies
 
