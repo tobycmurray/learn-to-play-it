@@ -42,16 +42,18 @@ ltpi practice song.mp3 bass
 
 Opens an interactive playback session with the bass part isolated, starting at 50% speed. Use keyboard controls to adjust:
 
-| Key       | Action                              |
-|-----------|-------------------------------------|
-| `SPACE`   | Play / pause                        |
-| `↑` / `↓` | Speed ±5% (range: 25%–150%)       |
-| `+` / `-` | Pitch ±10 cents                    |
-| `[` / `]` | Set loop start / end               |
-| `L`       | Toggle loop on/off                  |
-| `0`       | Reset to beginning                  |
-| `S`       | Cycle mode: solo → mute → mix      |
-| `Q`       | Quit                                |
+| Key     | Action                                |
+|---------|---------------------------------------|
+| `SPACE` | Play / pause                          |
+| `W`/`X` | Speed up / down ±10% (range: 20%–150%) |
+| `E`/`C` | Pitch up / down ±10 cents (range: ±200c) |
+| `A`/`D` | Seek back / forward 5 seconds        |
+| `[`     | Set loop point (first press = start, second = end) |
+| `L`     | Toggle loop on/off                    |
+| `H`     | Hold — freeze last 100ms and loop it |
+| `S`     | Cycle mode: solo → mute → mix        |
+| `0`     | Restart from beginning                |
+| `Q`     | Quit                                  |
 
 **Modes** (cycled with `S`):
 - **solo** — hear only the selected part
@@ -76,7 +78,7 @@ Shows which stems are available after separation.
 
 ## How it works
 
-- **Source separation**: [Demucs](https://github.com/adefossez/demucs) (Meta Research) splits audio into four stems: vocals, drums, bass, and other
+- **Source separation**: [Demucs](https://github.com/adefossez/demucs) (Meta Research) splits audio into six stems: vocals, drums, bass, guitar, piano, and other
 - **Time-stretching**: [Rubber Band](https://breakfastquay.com/rubberband/) changes playback speed without affecting pitch
 - **Pitch-shifting**: Rubber Band shifts pitch in cents without affecting speed
 - **Playback**: [sounddevice](https://python-sounddevice.readthedocs.io/) provides low-latency audio output
@@ -84,6 +86,25 @@ Shows which stems are available after separation.
 ## Stem cache
 
 Separated stems are stored under `stems/<song-name>/` and reused across sessions. Re-running `separate` on an already-processed song is a no-op.
+
+## Getting audio from YouTube
+
+You can use [yt-dlp](https://github.com/yt-dlp/yt-dlp) to download audio from YouTube for use with ltpi:
+
+```bash
+# Install yt-dlp
+brew install yt-dlp        # macOS
+pip install yt-dlp         # or via pip
+
+# Download audio as MP3
+yt-dlp -x --audio-format mp3 -o "song.%(ext)s" "https://youtube.com/watch?v=..."
+
+# Then separate and practice
+ltpi separate song.mp3
+ltpi practice song.mp3 guitar
+```
+
+**Legal note**: Downloading audio from YouTube may violate YouTube's Terms of Service and could raise copyright concerns depending on your jurisdiction. Users are responsible for ensuring their use complies with applicable laws and terms. This tool is intended for personal practice and educational use.
 
 ## Future directions
 
