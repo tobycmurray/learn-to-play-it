@@ -131,9 +131,7 @@ ltpi practice song.mp3 guitar
 
 **Legal note**: Downloading audio from YouTube may violate YouTube's Terms of Service and could raise copyright concerns depending on your jurisdiction. Users are responsible for ensuring their use complies with applicable laws and terms. This tool is intended for personal practice and educational use.
 
-## Future directions
+## Possible Future directions
 
-- Beat-aware loop snapping (snap `[` / `]` to bar boundaries)
-- Waveform visualisation in the terminal
 - MIDI / guitar tab transcription from isolated parts
 - GUI frontend
