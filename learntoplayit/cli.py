@@ -2,9 +2,13 @@ import click
 
 
 @click.group()
-def main():
+@click.option("--stems-dir", type=click.Path(), default=None, help="Directory for stem cache (default: ./stems)")
+@click.pass_context
+def main(ctx, stems_dir):
     """Learn to play musical parts from recorded songs."""
-    pass
+    if stems_dir is not None:
+        from .separate import set_stems_root
+        set_stems_root(stems_dir)
 
 
 @main.command()

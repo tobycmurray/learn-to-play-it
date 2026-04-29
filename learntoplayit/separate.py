@@ -6,6 +6,11 @@ STEM_NAMES = ["vocals", "drums", "bass", "guitar", "piano", "other"]
 STEMS_ROOT = Path("stems")
 
 
+def set_stems_root(path: str | Path):
+    global STEMS_ROOT
+    STEMS_ROOT = Path(path)
+
+
 def file_hash(audio_file: str) -> str:
     h = hashlib.sha256()
     with open(audio_file, "rb") as f:
