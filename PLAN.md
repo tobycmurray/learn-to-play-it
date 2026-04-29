@@ -50,9 +50,18 @@
 | numpy         | Audio data as arrays                     |
 | click         | CLI framework                            |
 
+## Phase 6: Polish and usability
+
+- [ ] 6.1 Hash-based file identification: map audio files to SHA-256 hash of contents, store stems in `stems/<hash>/`. This means renaming or moving the mp3 won't cause re-separation, and two copies of the same file share stems.
+- [ ] 6.2 Add `--speed` and `--pitch` options to `practice` and `play-along` commands to set initial speed (as percentage, e.g. `--speed 70`) and pitch (in cents, e.g. `--pitch -50`). Defaults unchanged (practice: 50% speed, 0c; play-along: 100% speed, 0c).
+- [ ] 6.3 Add `ltpi clean <file>` command: resolve file to hash, find and delete corresponding stems directory. Print what was deleted or say nothing to clean.
+- [ ] 6.4 Show total duration in MM:SS format in the status line (in addition to seconds) for longer tracks where raw seconds are hard to interpret.
+- [ ] 6.5 Add `--stems-dir` global option to override the default `stems/` location (e.g. store stems on an external drive or shared location).
+- [ ] 6.6 Handle edge cases: missing FFmpeg/rubberband CLI (friendly error on launch), Demucs model download failure, audio file that can't be decoded.
+
 ## Notes
 
-- Phases are sequential: each depends on the previous
-- Within a phase, tasks can mostly be done in order, though some are parallelisable
+- Phases 1–5 are sequential: each depends on the previous
+- Phase 6 tasks are independent of each other and can be done in any order
 - Phase 4 is the most complex — the interactive player with real-time controls
 - We will test with real audio at the end of each phase where applicable

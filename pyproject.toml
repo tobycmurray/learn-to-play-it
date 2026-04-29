@@ -18,5 +18,8 @@ dependencies = [
     "click",
 ]
 
+[tool.setuptools.packages.find]
+include = ["learntoplayit*"]
+
 [project.scripts]
 ltpi = "learntoplayit.cli:main"
