@@ -8,33 +8,170 @@ Eliminate audio pauses during speed/pitch/mode changes. Currently playback goes 
 
 There are two approaches we might use, described below.
 
-## Approach 1: Ring-buffer with librubberband
+## Approach 1: Ring-buffer with pylibrb (recommended)
 
-This approach requires using the librubberband C API via ctypes, ditching pyrubberband entirely.
+Replace pyrubberband (subprocess) with [pylibrb](https://github.com/pawel-glomski/pylibrb) — a direct Python binding to librubberband's real-time streaming API. This eliminates the batch-processing model entirely.
 
-librubberband has a real-time API designed for exactly our use case. Instead of processing the entire song upfront, you create a
-"stretcher" instance with your desired speed/pitch, then feed it audio blocks and get processed blocks back with minimal latency.
-This means:
+**Key properties:**
+- No pre-processing. Audio is stretched/shifted on the fly, block by block.
+- Speed/pitch changes are instant. Set `stretcher.time_ratio` / `stretcher.pitch_scale` — takes effect on the next block.
+- No rebuild concept. `_pause_rebuild_resume` disappears entirely.
+- Memory drops. No full processed buffer in memory — just raw stems + a small ring buffer (~16k samples).
 
-- No pre-processing at all. The audio callback (or a feeder thread) reads from the raw stems and stretches on the fly.
-- Speed/pitch changes are instant. Create a new stretcher with the new parameters. Next block comes out at the new speed. The
-library handles phase coherence across the transition internally.
-- No rebuild concept. No double-buffering, no chunking, no background threads. The entire _pause_rebuild_resume pattern
-disappears.
-- Memory drops. No need to store the full processed buffer — just the raw stems plus a small output ring buffer.
+**License:** pylibrb is GPLv2 (wraps librubberband which is GPL). We relicense from MIT to GPLv2.
 
-This is a fundamentally different architecture — streaming instead of batch — and it's simpler than what we have now, not more
-complex. The double-buffered design below would be unnecessary here.
+### Architecture
 
-The implementation would roughly be:
-1. Load librubberband via ctypes at startup
-2. Create a stretcher instance with current speed/pitch
-3. A feeder thread reads raw stem audio, pushes through the stretcher, fills a small ring buffer
-4. The sounddevice callback reads from the ring buffer
-5. On speed/pitch change: create a new stretcher, feeder picks it up immediately
+```
+┌──────────┐     ┌───────────┐     ┌─────────────┐     ┌──────────────┐
+│ Raw mix  │ ──▶ │  Feeder   │ ──▶ │ Ring buffer │ ──▶ │   Callback   │ ──▶ speakers
+│ (stems)  │     │  thread   │     │ (~16k samp) │     │ (sounddevice)│
+└──────────┘     └───────────┘     └─────────────┘     └──────────────┘
+                       │
+                 ┌─────┴──────┐
+                 │ Stretcher  │
+                 │ (pylibrb)  │
+                 └────────────┘
+```
 
-This would require researching the exact librubberband API and seeing if there's an existing Python binding, or whether we'd
-need a thin ctypes wrapper.
+**Three threads:**
+1. **Main thread** — handles keyboard input, updates parameters
+2. **Feeder thread** — reads from raw mix, pushes through stretcher, writes to ring buffer
+3. **Callback thread** (sounddevice) — reads from ring buffer, outputs to speakers
+
+### pylibrb usage
+
+```python
+from pylibrb import RubberBandStretcher, Option
+
+stretcher = RubberBandStretcher(
+    sample_rate=44100,
+    channels=2,
+    options=Option.PROCESS_REALTIME | Option.ENGINE_FINER | Option.PITCH_HIGH_CONSISTENCY,
+    initial_time_ratio=1 / speed,       # time_ratio = 1/speed (0.5x speed → ratio 2.0)
+    initial_pitch_scale=2 ** (cents / 1200),  # cents to frequency ratio
+)
+stretcher.set_max_process_size(BLOCK_SIZE)
+
+# In feeder loop:
+stretcher.time_ratio = 1 / self.speed
+stretcher.pitch_scale = 2 ** (self.cents / 1200)
+stretcher.process(block)                # shape (channels, samples), float32
+output = stretcher.retrieve_available() # variable-size output
+ring_buffer.write(output)
+```
+
+### Ring buffer
+
+Single-producer (feeder), single-consumer (callback). Lock-free via read/write indices:
+
+```python
+class RingBuffer:
+    def __init__(self, capacity, channels):
+        self.buf = np.zeros((capacity, channels), dtype=np.float32)
+        self.capacity = capacity
+        self.write_pos = 0
+        self.read_pos = 0
+
+    def available(self) -> int:
+        return (self.write_pos - self.read_pos) % self.capacity
+
+    def free(self) -> int:
+        return self.capacity - 1 - self.available()
+
+    def write(self, data): ...   # copy into buf, advance write_pos
+    def read(self, n): ...       # copy from buf, advance read_pos
+    def flush(self):             # reset both pointers (on seek)
+        self.read_pos = self.write_pos
+```
+
+Size: ~16384 samples (~370ms at 44.1kHz). Enough to survive scheduling jitter without underrun, small enough that seek/parameter changes feel responsive.
+
+### Position tracking
+
+Position advances in the **feeder thread** as it reads from the raw mix:
+
+```python
+self.pos_orig += block_size  # feeder advances after each block read
+```
+
+The main thread reads `self.pos_orig` for the status display. Seeks write to `self.pos_orig` and signal the feeder to jump.
+
+Note: there's a slight display-vs-audio discrepancy (~370ms) because the ring buffer holds audio that hasn't been output yet. This is cosmetic and not worth correcting.
+
+### Feature mapping
+
+#### Speed/pitch change
+Main thread sets `self.speed` / `self.cents`. Feeder reads these each iteration and updates the stretcher properties. Change takes effect within one block (~46ms). No pause, no rebuild, no buffer swap.
+
+#### Mode change (solo/mute/mix)
+Mode change requires switching the raw audio source. The feeder checks `self.mode` each iteration and calls `mix_stems()` to produce the appropriate mix. Since `mix_stems` operates on the full stems array, we pre-compute all three mixes at startup and the feeder just switches which one it reads from:
+
+```python
+self.mixes = {
+    "solo": mix_stems(stems, "solo", part),
+    "mute": mix_stems(stems, "mute", part),
+    "mix":  mix_stems(stems, "mix", part),
+}
+```
+
+Mode switch is instant — the feeder reads from a different array on the next iteration.
+
+#### Seek (Z/V/X/C/0)
+1. Main thread sets `self.pos_orig` to new position
+2. Main thread sets `self._seek_requested = True`
+3. Feeder notices the flag, flushes the ring buffer, resets the stretcher, starts reading from new position
+4. Brief silence (~one callback block) while ring buffer refills
+
+#### Loop
+Feeder handles wrapping: when `pos_orig` reaches `loop.end_orig`, jump back to `loop.start_orig`. The stretcher handles the input discontinuity gracefully in real-time mode (it's designed for live input).
+
+#### Hold
+When hold activates:
+1. Capture the last HOLD_DURATION seconds of output from the ring buffer (read backwards from write_pos)
+2. Store as `hold.slice`
+3. Callback loops the hold slice instead of reading from ring buffer
+4. Feeder pauses (stops advancing position)
+
+When hold releases:
+5. Callback resumes reading from ring buffer
+6. Feeder resumes from where it was
+
+Speed/pitch changes during hold: re-process the held region through a fresh stretcher with new parameters. This is a tiny slice (~0.2s) so it's instant.
+
+### Implementation steps
+
+- [ ] 1. Add `pylibrb` to dependencies, remove `pyrubberband`. Change license to GPLv2.
+- [ ] 2. Implement `RingBuffer` class (single-producer, single-consumer, numpy-backed).
+- [ ] 3. Implement feeder thread: reads from raw mix, feeds stretcher, writes to ring buffer. Handles seek/loop/pause signals.
+- [ ] 4. Rewrite `Player.__init__`: pre-compute mixes, create stretcher, start feeder thread.
+- [ ] 5. Rewrite `_callback`: read from ring buffer (or loop hold slice). Remove all buffer-position math.
+- [ ] 6. Rewrite `_change_speed` / `_change_pitch`: just update `self.speed` / `self.cents`. No rebuild.
+- [ ] 7. Rewrite `_change_mode`: just update `self.mode`. Feeder picks it up.
+- [ ] 8. Rewrite `_seek`: set new pos_orig, signal feeder to flush and jump.
+- [ ] 9. Rewrite `_toggle_hold`: capture slice from ring buffer, pause/resume feeder.
+- [ ] 10. Update `audio.py`: remove `process_audio`, `time_stretch`, `pitch_shift` (no longer needed). Keep `load_all_stems` and `mix_stems`.
+- [ ] 11. Update tests: remove pyrubberband-based audio processing tests, add ring buffer unit tests and stretcher integration tests.
+- [ ] 12. Clean shutdown: signal feeder thread to exit, join it, close stream.
+
+### What simplifies vs current code
+
+| Current | After |
+|---------|-------|
+| `_pause_rebuild_resume` (pause, stretch entire song, resume) | Gone |
+| `_buf_pos()` / `_orig_pos()` conversion math | Gone |
+| `self.audio` (full processed buffer, ~20MB) | Gone |
+| `process_audio()` / `time_stretch()` / `pitch_shift()` | Gone |
+| Complex callback with buffer-position arithmetic | Simple ring buffer read |
+
+### What stays the same
+
+- `LoopRegion` dataclass and its invariant logic
+- `HoldState` dataclass (slice capture mechanism changes, concept unchanged)
+- Key handling (`_handle_key` dispatch)
+- Status line display (reads pos_orig, speed, cents, mode — all unchanged)
+- CLI layer (no changes)
+- Separation (demucs, stems, caching — all unchanged)
 
 
 ## Approach 2: Double buffering
