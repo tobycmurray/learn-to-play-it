@@ -20,6 +20,24 @@ WAVEFORM_BG = QColor(30, 30, 35)
 MONO_FONT = "'Menlo', 'Courier New', monospace"
 
 
+class ActionButton(QPushButton):
+
+    def __init__(self, action, key, parent=None):
+        super().__init__(parent)
+        self.setFixedHeight(40)
+        btn_layout = QHBoxLayout(self)
+        btn_layout.setContentsMargins(12, 0, 12, 0)
+        self._action_label = QLabel(action)
+        btn_layout.addWidget(self._action_label)
+        btn_layout.addStretch()
+        self._key_label = QLabel(key)
+        self._key_label.setStyleSheet("color: gray;")
+        btn_layout.addWidget(self._key_label)
+
+    def set_action(self, text):
+        self._action_label.setText(text)
+
+
 class WaveformWidget(QWidget):
 
     def __init__(self):
@@ -155,18 +173,15 @@ class PlayerWidget(QWidget):
     def _build_transport(self, layout):
         row = QHBoxLayout()
 
-        self.play_btn = QPushButton("▶  Play  [Space]")
-        self.play_btn.setFixedHeight(40)
+        self.play_btn = ActionButton("▶ Play", "Space")
         self.play_btn.clicked.connect(lambda: self._cmd(lambda p: p.toggle_play()))
         row.addWidget(self.play_btn)
 
-        restart_btn = QPushButton("⏮  Restart  [0]")
-        restart_btn.setFixedHeight(40)
+        restart_btn = ActionButton("⏮ Restart", "0")
         restart_btn.clicked.connect(lambda: self._cmd(lambda p: p.restart()))
         row.addWidget(restart_btn)
 
-        self.hold_btn = QPushButton("⏺  Hold  [H]")
-        self.hold_btn.setFixedHeight(40)
+        self.hold_btn = ActionButton("⏺ Hold", "H")
         self.hold_btn.clicked.connect(lambda: self._cmd(lambda p: p.toggle_hold()))
         row.addWidget(self.hold_btn)
 
@@ -177,14 +192,13 @@ class PlayerWidget(QWidget):
 
         seek = f"{SEEK_SECONDS:g}s"
         nudge = f"{NUDGE_SECONDS:g}s"
-        for label, seconds in [
-            (f"«  −{seek}  [Z]", -SEEK_SECONDS),
-            (f"‹  −{nudge}  [X]", -NUDGE_SECONDS),
-            (f"›  +{nudge}  [C]", NUDGE_SECONDS),
-            (f"»  +{seek}  [V]", SEEK_SECONDS),
+        for action, key, seconds in [
+            (f"« −{seek}", "Z", -SEEK_SECONDS),
+            (f"‹ −{nudge}", "X", -NUDGE_SECONDS),
+            (f"› +{nudge}", "C", NUDGE_SECONDS),
+            (f"» +{seek}", "V", SEEK_SECONDS),
         ]:
-            btn = QPushButton(label)
-            btn.setFixedHeight(40)
+            btn = ActionButton(action, key)
             btn.clicked.connect(lambda _, s=seconds: self._cmd(lambda p: p.seek(s)))
             row.addWidget(btn)
 
@@ -223,23 +237,22 @@ class PlayerWidget(QWidget):
         layout.addWidget(sep)
 
         row = QHBoxLayout()
-        row.addWidget(QLabel("Loop"))
 
-        start_btn = QPushButton("[  Start")
-        start_btn.setFixedHeight(40)
+        start_btn = ActionButton("Set Start", "[")
         start_btn.clicked.connect(lambda: self._cmd(lambda p: p.set_loop_start()))
         row.addWidget(start_btn)
 
-        end_btn = QPushButton("]  End")
-        end_btn.setFixedHeight(40)
+        end_btn = ActionButton("Set End", "]")
         end_btn.clicked.connect(lambda: self._cmd(lambda p: p.set_loop_end()))
         row.addWidget(end_btn)
 
-        self.loop_btn = QPushButton("OFF  [L]")
-        self.loop_btn.setFixedHeight(40)
-        self.loop_btn.setFixedWidth(80)
+        self.loop_btn = ActionButton("Enable Loop", "L")
+        self.loop_btn.setMinimumWidth(160)
         self.loop_btn.clicked.connect(lambda: self._cmd(lambda p: p.toggle_loop()))
         row.addWidget(self.loop_btn)
+
+        self.loop_status = QLabel("")
+        row.addWidget(self.loop_status)
 
         self.loop_label = QLabel("")
         self.loop_label.setStyleSheet(f"font-family: {MONO_FONT};")
@@ -250,13 +263,14 @@ class PlayerWidget(QWidget):
 
     def _build_mode(self, layout):
         row = QHBoxLayout()
-        row.addWidget(QLabel("Mode"))
 
-        self.mode_btn = QPushButton("solo  [M]")
-        self.mode_btn.setFixedHeight(40)
-        self.mode_btn.setFixedWidth(100)
+        self.mode_btn = ActionButton("Change Mode", "M")
+        self.mode_btn.setMinimumWidth(160)
         self.mode_btn.clicked.connect(lambda: self._cmd(lambda p: p.change_mode()))
         row.addWidget(self.mode_btn)
+
+        self.mode_label = QLabel("")
+        row.addWidget(self.mode_label)
 
         self.part_label = QLabel("")
         self.part_label.setStyleSheet("color: gray;")
@@ -281,19 +295,22 @@ class PlayerWidget(QWidget):
         self.speed_slider.set_value(int(round(p.speed * 100)))
         self.pitch_slider.set_value(int(round(p.cents)))
 
-        self.play_btn.setText("⏸  Pause  [Space]" if p.playing else "▶  Play  [Space]")
-        self.hold_btn.setText("⏺  Release  [H]" if p.hold is not None else "⏺  Hold  [H]")
-        self.mode_btn.setText(f"{p.mode}  [M]")
+        self.play_btn.set_action("⏸ Pause" if p.playing else "▶ Play")
+        self.hold_btn.set_action("⏺ Release" if p.hold is not None else "⏺ Hold")
+        self.mode_label.setText(f"<b>Playback Mode:</b> {p.mode}")
 
         bounds = p.loop_bounds
         if bounds is not None and (bounds[0] is not None or bounds[1] is not None):
             ls = fmt_time(bounds[0]) if bounds[0] is not None else "?"
             le = fmt_time(bounds[1]) if bounds[1] is not None else "?"
+            active = bounds[2]
+            self.loop_status.setText(f"<b>Loop:</b> {'on' if active else 'off'}")
             self.loop_label.setText(f"{ls} – {le}")
-            self.loop_btn.setText("ON  [L]" if bounds[2] else "OFF  [L]")
+            self.loop_btn.set_action("Disable Loop" if active else "Enable Loop")
         else:
+            self.loop_status.setText("<b>Loop:</b> off")
             self.loop_label.setText("")
-            self.loop_btn.setText("OFF  [L]")
+            self.loop_btn.set_action("Enable Loop")
 
         self.waveform.update()
 
@@ -307,7 +324,8 @@ class GuiDisplay(QMainWindow):
         self.player = player
 
         self.setWindowTitle(f"ltpi — {player.part}")
-        self.setMinimumWidth(480)
+        self.setMinimumWidth(720)
+        self.resize(720, 580)
 
         self.player_widget = PlayerWidget()
         self.setCentralWidget(self.player_widget)

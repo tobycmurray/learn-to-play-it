@@ -168,7 +168,8 @@ class AppWindow(QMainWindow):
         self._audio_file = None
 
         self.setWindowTitle("Learn To Play It")
-        self.setMinimumWidth(520)
+        self.setMinimumWidth(720)
+        self.resize(720, 580)
 
         self._build_menu()
 
