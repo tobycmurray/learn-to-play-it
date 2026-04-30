@@ -129,6 +129,7 @@ class PlayerWidget(QWidget):
 
         self._build_status(layout)
         self._build_transport(layout)
+        self._build_seek(layout)
         self._build_center(layout)
         self._build_loop(layout)
         self._build_mode(layout)
@@ -168,6 +169,22 @@ class PlayerWidget(QWidget):
         self.hold_btn.setFixedHeight(40)
         self.hold_btn.clicked.connect(lambda: self._cmd(lambda p: p.toggle_hold()))
         row.addWidget(self.hold_btn)
+
+        layout.addLayout(row)
+
+    def _build_seek(self, layout):
+        row = QHBoxLayout()
+
+        for label, seconds in [
+            ("«  −5s  [Z]", -SEEK_SECONDS),
+            ("‹  −0.05s  [X]", -NUDGE_SECONDS),
+            ("›  +0.05s  [C]", NUDGE_SECONDS),
+            ("»  +5s  [V]", SEEK_SECONDS),
+        ]:
+            btn = QPushButton(label)
+            btn.setFixedHeight(32)
+            btn.clicked.connect(lambda _, s=seconds: self._cmd(lambda p: p.seek(s)))
+            row.addWidget(btn)
 
         layout.addLayout(row)
 
