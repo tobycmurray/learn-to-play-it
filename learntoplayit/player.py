@@ -1,8 +1,3 @@
-import os
-import sys
-import tty
-import termios
-import select
 import threading
 from dataclasses import dataclass
 
@@ -17,7 +12,7 @@ SPEED_MIN = 0.2
 SPEED_MAX = 1.5
 SPEED_STEP = 0.1
 PITCH_STEP = 10
-PITCH_MIN = -1200 # allow for a full octave either way
+PITCH_MIN = -1200
 PITCH_MAX = 1200
 SEEK_SECONDS = 5
 NUDGE_SECONDS = 0.05
@@ -26,11 +21,6 @@ HOLD_DURATION = 0.4
 BLOCK_SIZE = 1024
 RING_CAPACITY = 16384
 MODES = ["solo", "mute", "mix"]
-
-WAVEFORM_BLOCKS = " ▁▂▃▄▅▆▇█"
-WAVEFORM_ROWS = 8
-# status line + waveform rows + marker row
-DISPLAY_LINES = 1 + WAVEFORM_ROWS + 1
 
 
 @dataclass
@@ -69,21 +59,16 @@ class HoldState:
     pos: int = 0
 
 
-def _read_key(timeout=0.1):
-    """Read a single keypress, or return None after timeout."""
-    fd = sys.stdin.fileno()
-    old = termios.tcgetattr(fd)
-    try:
-        tty.setraw(fd)
-        if select.select([sys.stdin], [], [], timeout)[0]:
-            return sys.stdin.read(1)
-        return None
-    finally:
-        termios.tcsetattr(fd, termios.TCSADRAIN, old)
+@dataclass
+class WaveformData:
+    bins: np.ndarray
+    cursor_col: int
+    loop_start_col: int | None
+    loop_end_col: int | None
 
 
 class Player:
-    """Interactive audio player with real-time speed/pitch/loop/hold controls.
+    """Audio engine with real-time speed/pitch/loop/hold controls.
 
     Architecture: a feeder thread reads raw audio, pushes it through a
     RubberBandStretcher in real-time mode, and writes to a ring buffer.
@@ -105,7 +90,7 @@ class Player:
         }
         self.channels = self.mixes["solo"].shape[1] if self.mixes["solo"].ndim > 1 else 1
         self.song_len = len(self.mixes["solo"])
-        self.mix_peaks = {mode: self._compute_rms_peak(mix) for mode, mix in self.mixes.items()}
+        self._mix_peaks = {mode: self._compute_rms_peak(mix) for mode, mix in self.mixes.items()}
 
         self.ring = RingBuffer(RING_CAPACITY, self.channels)
         self.stretcher = self._make_stretcher()
@@ -114,7 +99,7 @@ class Player:
         self.device = device
         self.playing = False
         self.quit = False
-        self.stream = None
+        self._stream = None
 
         self.loop: LoopRegion | None = None
         self.hold: HoldState | None = None
@@ -135,13 +120,27 @@ class Player:
         return float(rms.max()) or 1.0
 
     @property
-    def _playback_pos(self):
-        """Estimated position of audio currently being heard by the user.
+    def playback_position(self):
+        """Current playback position in seconds."""
+        return self._playback_pos / self.sr
 
-        The feeder runs ahead of playback — the ring buffer holds stretched
-        audio that hasn't reached the speakers yet. We subtract that to
-        approximate what's actually playing.
-        """
+    @property
+    def song_duration(self):
+        """Total song duration in seconds."""
+        return self.song_len / self.sr
+
+    @property
+    def loop_bounds(self):
+        """Loop info: (start_secs|None, end_secs|None, active), or None if no loop."""
+        loop = self.loop
+        if loop is None:
+            return None
+        start = loop.start_orig / self.sr if loop.start_orig is not None else None
+        end = loop.end_orig / self.sr if loop.end_orig is not None else None
+        return start, end, loop.active
+
+    @property
+    def _playback_pos(self):
         buffered_orig = int(self.ring.available() * self.speed)
         return max(0, self.pos_orig - buffered_orig)
 
@@ -245,54 +244,15 @@ class Player:
             if self.pos_orig >= self.song_len:
                 self.playing = False
 
-    @staticmethod
-    def _fmt_time(secs):
-        m, s = divmod(secs, 60)
-        return f"{int(m)}:{s:05.2f}"
+    # --- Waveform data ---
 
-    def _status_text(self):
-        original_secs = self._playback_pos / self.sr
-        total_secs = self.song_len / self.sr
-        if self.hold is not None:
-            state = "⏺"
-        elif self.playing:
-            state = "▶"
-        else:
-            state = "⏸"
-        speed_pct = int(round(self.speed * 100))
-
-        c = round(self.cents)
-        if c == 0:
-            cents_str = "0c"
-        elif abs(c) < 100:
-            cents_str = f"{c:+}c"
-        else:
-            st = int(c / 100)
-            rem = c - st * 100
-            cents_str = f"{st:+}st" if rem == 0 else f"{st:+}st{rem:+}c"
-
-        loop = self.loop
-        if loop is not None and (loop.start_orig is not None or loop.end_orig is not None):
-            ls_str = self._fmt_time(loop.start_orig / self.sr) if loop.start_orig is not None else "?"
-            le_str = self._fmt_time(loop.end_orig / self.sr) if loop.end_orig is not None else "?"
-            loop_str = f"loop: {'ON' if loop.active else 'OFF'} {ls_str}-{le_str}"
-        else:
-            loop_str = "loop: OFF"
-
-        return (
-            f"  {state} {self._fmt_time(original_secs)} / {self._fmt_time(total_secs)}  |  "
-            f"speed: {speed_pct}%  |  pitch: {cents_str}  |  "
-            f"{loop_str}  |  "
-            f"mode: {self.mode}  |  part: {self.part}"
-        )
-
-    def _waveform_bins(self, waveform_width):
+    def waveform_bins(self, num_bins):
         bin_samples = int(NUDGE_SECONDS * self.sr)
-        half = waveform_width // 2
+        half = num_bins // 2
         window_start = self._playback_pos - half * bin_samples
 
         mix = self.mixes[self.mode]
-        end = window_start + waveform_width * bin_samples
+        end = window_start + num_bins * bin_samples
         pad_left = max(0, -window_start)
         pad_right = max(0, end - self.song_len)
         segment = mix[max(0, window_start):min(self.song_len, end)]
@@ -309,123 +269,50 @@ class Player:
 
         bins = np.array([
             np.sqrt(np.mean(segment[i * bin_samples:(i + 1) * bin_samples] ** 2))
-            for i in range(waveform_width)
+            for i in range(num_bins)
         ])
-        bins /= self.mix_peaks[self.mode]
+        bins /= self._mix_peaks[self.mode]
         np.clip(bins, 0, 1, out=bins)
-        return bins, half, window_start, bin_samples
 
-    @staticmethod
-    def _bins_to_rows(bins):
-        levels = len(WAVEFORM_BLOCKS) - 1
-        rows = []
-        for row in range(WAVEFORM_ROWS - 1, -1, -1):
-            threshold = row / WAVEFORM_ROWS
-            next_threshold = (row + 1) / WAVEFORM_ROWS
-            line = []
-            for v in bins:
-                if v >= next_threshold:
-                    line.append(WAVEFORM_BLOCKS[-1])
-                elif v > threshold:
-                    frac = (v - threshold) / (next_threshold - threshold)
-                    line.append(WAVEFORM_BLOCKS[max(1, int(frac * levels))])
-                else:
-                    line.append(" ")
-            rows.append("".join(line))
-        return rows
-
-    def _marker_line(self, width, cursor_col, window_start, bin_samples):
-        markers = [" "] * width
-        markers[cursor_col] = "↑"
+        loop_start_col = None
+        loop_end_col = None
         loop = self.loop
         if loop is not None:
-            for pos, char in [(loop.start_orig, "["), (loop.end_orig, "]")]:
-                if pos is not None:
-                    col = (pos - window_start) // bin_samples
-                    if 0 <= col < width:
-                        markers[col] = char
-        return "  " + "".join(markers)
+            if loop.start_orig is not None:
+                col = (loop.start_orig - window_start) // bin_samples
+                if 0 <= col < num_bins:
+                    loop_start_col = col
+            if loop.end_orig is not None:
+                col = (loop.end_orig - window_start) // bin_samples
+                if 0 <= col < num_bins:
+                    loop_end_col = col
 
-    def _print_status(self):
-        term_width = os.get_terminal_size().columns
-        status = self._status_text()[:term_width].ljust(term_width)
+        return WaveformData(bins=bins, cursor_col=half, loop_start_col=loop_start_col, loop_end_col=loop_end_col)
 
-        show_waveform = not self.playing and self.hold is None
-        waveform_width = term_width - 4
+    # --- Commands ---
 
-        if show_waveform and waveform_width >= 10:
-            bins, cursor_col, window_start, bin_samples = self._waveform_bins(waveform_width)
-            rows = self._bins_to_rows(bins)
-            markers = self._marker_line(waveform_width, cursor_col, window_start, bin_samples)
-            body = [f"  {row}"[:term_width] for row in rows] + [markers[:term_width]]
-        else:
-            if show_waveform:
-                hint = "  (widen terminal to see waveform)"
-            elif self.hold is not None:
-                hint = "  (hold active — H to release)"
-            else:
-                hint = "  (SPACE to pause and show waveform)"
-            blank = "".ljust(term_width)
-            body = [blank] * (DISPLAY_LINES - 1)
-            body[WAVEFORM_ROWS // 2] = hint[:term_width].ljust(term_width)
+    def toggle_play(self):
+        self.playing = not self.playing
 
-        assert len(body) == DISPLAY_LINES - 1
-        lines = [status] + body
-        print("\r" + "\n".join(lines), end="", flush=True)
-        print(f"\033[{DISPLAY_LINES - 1}A\r", end="", flush=True)
-
-    def run(self):
-        print(f"Playing: {self.part} ({self.mode})")
-        print("Controls: SPACE=play/pause  W/S=speed  E/D=pitch  Z/X/C/V=seek  H=hold")
-        print("          [/]=loop start/end  L=loop  M=mode  0=restart  Q=quit")
-        print()
-
-        self.stream = sd.OutputStream(
-            samplerate=self.sr,
-            channels=self.channels,
-            callback=self._callback,
-            blocksize=2048,
-            device=self.device,
-        )
-        self.stream.start()
-
-        self._feeder_thread = threading.Thread(target=self._feeder_loop, daemon=True)
-        self._feeder_thread.start()
-
-        self.playing = True
-
-        try:
-            while not self.quit:
-                self._print_status()
-                key = _read_key()
-                if key is not None:
-                    self._handle_key(key)
-        finally:
-            self._feeder_stop.set()
-            self._feeder_thread.join(timeout=2)
-            self.stream.stop()
-            self.stream.close()
-            print()
-
-    def _change_speed(self, delta):
+    def change_speed(self, delta):
         new_speed = round(min(SPEED_MAX, max(SPEED_MIN, self.speed + delta)), 2)
         if new_speed == self.speed:
             return
         self.speed = new_speed
         self._rebuild_hold_slice()
 
-    def _change_pitch(self, delta):
+    def change_pitch(self, delta):
         new_cents = min(PITCH_MAX, max(PITCH_MIN, self.cents + delta))
         if new_cents == self.cents:
             return
         self.cents = new_cents
         self._rebuild_hold_slice()
 
-    def _change_mode(self):
+    def change_mode(self):
         idx = (MODES.index(self.mode) + 1) % len(MODES)
         self.mode = MODES[idx]
 
-    def _seek(self, seconds):
+    def seek(self, seconds):
         if self.hold is not None:
             return
         delta_orig = int(seconds * self.sr)
@@ -440,17 +327,17 @@ class Player:
         self.pos_orig = new_pos
         self._seek_requested = True
 
-    def _set_loop_start(self):
+    def set_loop_start(self):
         if self.loop is None:
             self.loop = LoopRegion()
         self.loop.set_start(self._playback_pos)
 
-    def _set_loop_end(self):
+    def set_loop_end(self):
         if self.loop is None:
             self.loop = LoopRegion()
         self.loop.set_end(self._playback_pos)
 
-    def _toggle_loop(self):
+    def toggle_loop(self):
         loop = self.loop
         if loop is None or not loop.is_complete():
             return
@@ -460,21 +347,7 @@ class Player:
                 self.pos_orig = loop.start_orig
                 self._seek_requested = True
 
-    def _process_hold_raw(self, raw: np.ndarray) -> np.ndarray:
-        s = self._make_stretcher()
-        s.process(raw.T, final=True)
-        return s.retrieve_available().T
-
-    def _rebuild_hold_slice(self):
-        hold = self.hold
-        if hold is None:
-            return
-        processed = self._process_hold_raw(hold.raw)
-        if len(processed) > 0:
-            hold.slice = processed
-            hold.pos = 0
-
-    def _toggle_hold(self):
+    def toggle_hold(self):
         if self.hold is not None:
             self.pos_orig = self.hold.end_orig
             self.hold = None
@@ -493,48 +366,57 @@ class Player:
             self.hold = HoldState(start_orig=start, end_orig=end, raw=raw, slice=processed)
             self._feeder_paused = True
 
-    def _handle_key(self, key):
-        if key == " ":
-            self.playing = not self.playing
-        elif key.lower() == "q":
-            self.quit = True
-        elif key == "0":
-            if self.hold is not None:
-                return
-            loop = self.loop
-            if loop is not None and loop.active:
-                self.pos_orig = loop.start_orig
-            else:
-                self.pos_orig = 0
-            self._seek_requested = True
-        elif key.lower() == "w":
-            self._change_speed(SPEED_STEP)
-        elif key.lower() == "s":
-            self._change_speed(-SPEED_STEP)
-        elif key.lower() == "e":
-            self._change_pitch(PITCH_STEP)
-        elif key.lower() == "d":
-            self._change_pitch(-PITCH_STEP)
-        elif key.lower() == "z":
-            self._seek(-SEEK_SECONDS)
-        elif key.lower() == "x":
-            self._seek(-NUDGE_SECONDS)
-        elif key.lower() == "c":
-            self._seek(NUDGE_SECONDS)
-        elif key.lower() == "v":
-            self._seek(SEEK_SECONDS)
-        elif key.lower() == "m":
-            self._change_mode()
-        elif key.lower() == "h":
-            self._toggle_hold()
-        elif key == "[":
-            self._set_loop_start()
-        elif key == "]":
-            self._set_loop_end()
-        elif key.lower() == "l":
-            self._toggle_loop()
+    def restart(self):
+        if self.hold is not None:
+            return
+        loop = self.loop
+        if loop is not None and loop.active:
+            self.pos_orig = loop.start_orig
+        else:
+            self.pos_orig = 0
+        self._seek_requested = True
+
+    def _process_hold_raw(self, raw: np.ndarray) -> np.ndarray:
+        s = self._make_stretcher()
+        s.process(raw.T, final=True)
+        return s.retrieve_available().T
+
+    def _rebuild_hold_slice(self):
+        hold = self.hold
+        if hold is None:
+            return
+        processed = self._process_hold_raw(hold.raw)
+        if len(processed) > 0:
+            hold.slice = processed
+            hold.pos = 0
+
+    # --- Lifecycle ---
+
+    def start(self):
+        self._stream = sd.OutputStream(
+            samplerate=self.sr,
+            channels=self.channels,
+            callback=self._callback,
+            blocksize=2048,
+            device=self.device,
+        )
+        self._stream.start()
+        self._feeder_thread = threading.Thread(target=self._feeder_loop, daemon=True)
+        self._feeder_thread.start()
+        self.playing = True
+
+    def stop(self):
+        self._feeder_stop.set()
+        if self._feeder_thread is not None:
+            self._feeder_thread.join(timeout=2)
+        if self._stream is not None:
+            self._stream.stop()
+            self._stream.close()
 
 
 def play_interactive(stems_dir, part, initial_mode="solo", initial_speed=0.5, initial_cents=0.0, device=None):
+    from .display import TerminalDisplay
+
     player = Player(stems_dir, part, initial_mode, initial_speed, initial_cents, device=device)
-    player.run()
+    display = TerminalDisplay(player)
+    display.run()

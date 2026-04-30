@@ -43,7 +43,12 @@ def test_import_separate():
 
 @needs_portaudio
 def test_import_player():
-    from learntoplayit.player import Player, play_interactive
+    from learntoplayit.player import Player, play_interactive, WaveformData
+
+
+@needs_portaudio
+def test_import_display():
+    from learntoplayit.display import TerminalDisplay
 
 
 def test_import_numpy():
