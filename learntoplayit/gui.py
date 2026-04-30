@@ -3,11 +3,12 @@ from PySide6.QtGui import QKeySequence, QShortcut, QPainter, QColor, QPen
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QHBoxLayout,
-    QLabel, QPushButton, QFrame,
+    QLabel, QPushButton, QFrame, QSlider,
 )
 
 from .player import (
     SPEED_STEP, PITCH_STEP, SEEK_SECONDS, NUDGE_SECONDS,
+    SPEED_MIN, SPEED_MAX, PITCH_MIN, PITCH_MAX,
 )
 from .fmt import fmt_time, fmt_pitch
 
@@ -70,6 +71,52 @@ class WaveformWidget(QWidget):
         painter.end()
 
 
+class SliderControl(QWidget):
+
+    def __init__(self, label, min_val, max_val, step, key_down, key_up, format_fn):
+        super().__init__()
+        self._format_fn = format_fn
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(2)
+        layout.setAlignment(Qt.AlignHCenter)
+
+        lbl = QLabel(label)
+        lbl.setAlignment(Qt.AlignCenter)
+        layout.addWidget(lbl)
+
+        self._value_label = QLabel("")
+        self._value_label.setAlignment(Qt.AlignCenter)
+        self._value_label.setStyleSheet("font-weight: bold;")
+        layout.addWidget(self._value_label)
+
+        up_label = QLabel(f"[{key_up}]")
+        up_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(up_label)
+
+        self._slider = QSlider(Qt.Vertical)
+        self._slider.setRange(min_val, max_val)
+        self._slider.setSingleStep(step)
+        self._slider.setPageStep(step)
+        self._slider.setMinimumHeight(80)
+        layout.addWidget(self._slider, alignment=Qt.AlignHCenter)
+
+        down_label = QLabel(f"[{key_down}]")
+        down_label.setAlignment(Qt.AlignCenter)
+        layout.addWidget(down_label)
+
+    def set_value(self, value):
+        self._slider.blockSignals(True)
+        self._slider.setValue(value)
+        self._slider.blockSignals(False)
+        self._value_label.setText(self._format_fn(value))
+
+    @property
+    def slider(self):
+        return self._slider
+
+
 class PlayerWidget(QWidget):
 
     def __init__(self, parent=None):
@@ -82,9 +129,7 @@ class PlayerWidget(QWidget):
 
         self._build_status(layout)
         self._build_transport(layout)
-        self._build_waveform(layout)
-        self.speed_label = self._build_adjuster(layout, "Speed", SPEED_STEP, lambda d: self._cmd(lambda p: p.change_speed(d)), "S", "W", width=60)
-        self.pitch_label = self._build_adjuster(layout, "Pitch", PITCH_STEP, lambda d: self._cmd(lambda p: p.change_pitch(d)), "D", "E", width=90)
+        self._build_center(layout)
         self._build_loop(layout)
         self._build_mode(layout)
 
@@ -126,34 +171,31 @@ class PlayerWidget(QWidget):
 
         layout.addLayout(row)
 
-    def _build_waveform(self, layout):
-        self.waveform = WaveformWidget()
-        layout.addWidget(self.waveform)
-
-    @staticmethod
-    def _build_adjuster(layout, label, step, command, key_down, key_up, width=60):
+    def _build_center(self, layout):
         row = QHBoxLayout()
-        row.addWidget(QLabel(label))
 
-        minus = QPushButton(f"−  [{key_down}]")
-        minus.setFixedWidth(64)
-        minus.clicked.connect(lambda: command(-step))
-        row.addWidget(minus)
+        self.waveform = WaveformWidget()
+        row.addWidget(self.waveform, stretch=1)
 
-        value_label = QLabel("")
-        value_label.setAlignment(Qt.AlignCenter)
-        value_label.setFixedWidth(width)
-        value_label.setStyleSheet("font-weight: bold;")
-        row.addWidget(value_label)
+        self.speed_slider = SliderControl(
+            "Speed", int(SPEED_MIN * 100), int(SPEED_MAX * 100),
+            int(SPEED_STEP * 100), "S", "W", lambda v: f"{v}%",
+        )
+        self.speed_slider.slider.valueChanged.connect(
+            lambda v: self._cmd(lambda p: p.change_speed(v / 100 - p.speed))
+        )
+        row.addWidget(self.speed_slider)
 
-        plus = QPushButton(f"+  [{key_up}]")
-        plus.setFixedWidth(64)
-        plus.clicked.connect(lambda: command(step))
-        row.addWidget(plus)
+        self.pitch_slider = SliderControl(
+            "Pitch", PITCH_MIN, PITCH_MAX,
+            PITCH_STEP, "D", "E", fmt_pitch,
+        )
+        self.pitch_slider.slider.valueChanged.connect(
+            lambda v: self._cmd(lambda p: p.change_pitch(v - p.cents))
+        )
+        row.addWidget(self.pitch_slider)
 
-        row.addStretch()
-        layout.addLayout(row)
-        return value_label
+        layout.addLayout(row, stretch=1)
 
     def _build_loop(self, layout):
         sep = QFrame()
@@ -213,8 +255,8 @@ class PlayerWidget(QWidget):
             state = "⏸"
         self.status_label.setText(f"{state}  {fmt_time(p.playback_position)} / {fmt_time(p.song_duration)}")
 
-        self.speed_label.setText(f"{int(round(p.speed * 100))}%")
-        self.pitch_label.setText(fmt_pitch(p.cents))
+        self.speed_slider.set_value(int(round(p.speed * 100)))
+        self.pitch_slider.set_value(int(round(p.cents)))
 
         self.play_btn.setText("⏸  Pause  [Space]" if p.playing else "▶  Play  [Space]")
         self.hold_btn.setText("⏺  Release  [H]" if p.hold is not None else "⏺  Hold  [H]")
