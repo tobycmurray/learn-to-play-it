@@ -17,8 +17,8 @@ SPEED_MIN = 0.2
 SPEED_MAX = 1.5
 SPEED_STEP = 0.1
 PITCH_STEP = 10
-PITCH_MIN = -200
-PITCH_MAX = 200
+PITCH_MIN = -1200 # allow for a full octave either way
+PITCH_MAX = 1200
 SEEK_SECONDS = 5
 NUDGE_SECONDS = 0.05
 HOLD_DURATION = 0.4
@@ -259,7 +259,16 @@ class Player:
         else:
             state = "⏸"
         speed_pct = int(round(self.speed * 100))
-        cents_str = f"{self.cents:+.0f}" if self.cents != 0 else "0"
+
+        c = round(self.cents)
+        if c == 0:
+            cents_str = "0c"
+        elif abs(c) < 100:
+            cents_str = f"{c:+}c"
+        else:
+            st = int(c / 100)
+            rem = c - st * 100
+            cents_str = f"{st:+}st" if rem == 0 else f"{st:+}st{rem:+}c"
 
         loop = self.loop
         if loop is not None and (loop.start_orig is not None or loop.end_orig is not None):
@@ -271,7 +280,7 @@ class Player:
 
         return (
             f"  {state} {self._fmt_time(original_secs)} / {self._fmt_time(total_secs)}  |  "
-            f"speed: {speed_pct}%  |  pitch: {cents_str}c  |  "
+            f"speed: {speed_pct}%  |  pitch: {cents_str}  |  "
             f"{loop_str}  |  "
             f"mode: {self.mode}  |  part: {self.part}"
         )
