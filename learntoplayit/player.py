@@ -65,6 +65,7 @@ class WaveformData:
     cursor_col: int
     loop_start_col: int | None
     loop_end_col: int | None
+    loop_active: bool
 
 
 class Player:
@@ -288,7 +289,8 @@ class Player:
                 if 0 <= col < num_bins:
                     loop_end_col = col
 
-        return WaveformData(bins=bins, cursor_col=half, loop_start_col=loop_start_col, loop_end_col=loop_end_col)
+        active = loop is not None and loop.active
+        return WaveformData(bins=bins, cursor_col=half, loop_start_col=loop_start_col, loop_end_col=loop_end_col, loop_active=active)
 
     # --- Commands ---
 

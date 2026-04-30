@@ -16,7 +16,10 @@ WAVEFORM_BINS = 100
 WAVEFORM_COLOR = QColor(70, 130, 220)
 PLAYHEAD_COLOR = QColor(255, 60, 60)
 LOOP_MARKER_COLOR = QColor(255, 200, 40)
+LOOP_FILL_COLOR = QColor(255, 200, 40, 30)
+LOOP_SERIF = 6
 WAVEFORM_BG = QColor(30, 30, 35)
+WAVEFORM_PAD = 4
 MONO_FONT = "'Menlo', 'Courier New', monospace"
 
 
@@ -48,6 +51,9 @@ class WaveformWidget(QWidget):
     def paintEvent(self, event):
         w = self.width()
         h = self.height()
+        pad = WAVEFORM_PAD
+        inner_h = h - 2 * pad
+        mid = h // 2
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, False)
 
@@ -63,23 +69,35 @@ class WaveformWidget(QWidget):
         painter.setPen(Qt.NoPen)
         painter.setBrush(WAVEFORM_COLOR)
         for i, v in enumerate(wd.bins):
-            bar_h = int(v * h)
-            if bar_h > 0:
+            half_h = int(v * inner_h / 2)
+            if half_h > 0:
                 x = int(i * bar_w)
                 bw = int((i + 1) * bar_w) - x
-                painter.drawRect(x, h - bar_h, bw, bar_h)
+                painter.drawRect(x, mid - half_h, bw, half_h * 2)
 
         def col_to_x(col):
             return int((col + 0.5) * bar_w)
 
+        ls_x = col_to_x(wd.loop_start_col) if wd.loop_start_col is not None else None
+        le_x = col_to_x(wd.loop_end_col) if wd.loop_end_col is not None else None
+
+        if wd.loop_active:
+            fill_l = ls_x if ls_x is not None else 0
+            fill_r = le_x if le_x is not None else w
+            painter.fillRect(fill_l, 0, fill_r - fill_l, h, LOOP_FILL_COLOR)
+
         pen = QPen(LOOP_MARKER_COLOR, 2)
         painter.setPen(pen)
-        if wd.loop_start_col is not None:
-            x = col_to_x(wd.loop_start_col)
-            painter.drawLine(x, 0, x, h)
-        if wd.loop_end_col is not None:
-            x = col_to_x(wd.loop_end_col)
-            painter.drawLine(x, 0, x, h)
+        top = pad
+        bot = h - pad
+        if ls_x is not None:
+            painter.drawLine(ls_x, top, ls_x, bot)
+            painter.drawLine(ls_x, top, ls_x + LOOP_SERIF, top)
+            painter.drawLine(ls_x, bot, ls_x + LOOP_SERIF, bot)
+        if le_x is not None:
+            painter.drawLine(le_x, top, le_x, bot)
+            painter.drawLine(le_x, top, le_x - LOOP_SERIF, top)
+            painter.drawLine(le_x, bot, le_x - LOOP_SERIF, bot)
 
         pen = QPen(PLAYHEAD_COLOR, 2)
         painter.setPen(pen)
