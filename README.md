@@ -48,7 +48,7 @@ Opens an interactive playback session with the bass part isolated, starting at 5
 |---------|---------------------------------------|
 | `SPACE` | Play / pause                          |
 | `W`/`S` | Speed up / down ±10% (range: 20%–150%) |
-| `E`/`D` | Pitch up / down ±10 cents (range: ±200c) |
+| `E`/`D` | Pitch up / down ±10 cents (up to ±1 octave) |
 | `Z`/`V` | Seek back / forward 5 seconds        |
 | `X`/`C` | Nudge back / forward 0.05 seconds    |
 | `[`/`]` | Set loop start / end                  |
@@ -105,6 +105,8 @@ Controls: SPACE=play/pause  W/S=speed  E/D=pitch  Z/X/C/V=seek  H=hold
 - **mute** — hear everything *except* the selected part (play-along)
 - **mix** — hear the full original mix
 
+Pitch is displayed in semitones and cents when the shift is large enough (e.g. `+3st+20c`), useful for transposing parts into a comfortable range.
+
 ### Play along
 
 ```bash
@@ -129,6 +131,21 @@ ltpi clean song.mp3
 ```
 
 Removes the cached stems for a song, freeing disk space.
+
+### Audio device selection
+
+By default, ltpi uses your system's default audio output. To use a different device:
+
+```bash
+# List available output devices
+ltpi devices
+
+# Select by index or name (substring match)
+ltpi practice song.mp3 guitar --device 5
+ltpi practice song.mp3 guitar --device "MacBook"
+```
+
+The `--device` option is available on both `practice` and `play-along`.
 
 ### Global options
 

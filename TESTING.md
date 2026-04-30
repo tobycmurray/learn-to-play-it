@@ -36,6 +36,9 @@ Unless otherwise noted, start each section from a fresh launch.
 | 3.2 | Press E again | Pitch shows +20c. Audibly higher than original |
 | 3.3 | Press D three times | Pitch shows -10c. Audio pitched slightly below original |
 | 3.4 | Verify position | Position should not jump; continues from where it was |
+| 3.5 | Press E until pitch reaches +100c | Pitch shows +1st (semitone format) |
+| 3.6 | Press E again | Pitch shows +1st+10c |
+| 3.7 | Press D until pitch reaches -200c | Pitch shows -2st |
 
 ## 4. Seek and nudge
 
@@ -144,7 +147,7 @@ Launch with: `ltpi play-along /tmp/safm.mp3 guitar`
 | 13.1 | `ltpi practice /tmp/safm.mp3 guitar --speed 70` | Starts at 70% speed |
 | 13.2 | `ltpi practice /tmp/safm.mp3 guitar --pitch -50` | Starts at -50c pitch |
 | 13.3 | `ltpi practice /tmp/safm.mp3 guitar --speed 10` | Error: speed must be between 20 and 150 |
-| 13.4 | `ltpi practice /tmp/safm.mp3 guitar --pitch 300` | Error: pitch must be between -200 and 200 |
+| 13.4 | `ltpi practice /tmp/safm.mp3 guitar --pitch 1300` | Error: pitch must be between -1200 and 1200 |
 
 ## 14. Separation and caching
 
@@ -157,10 +160,20 @@ Launch with: `ltpi play-along /tmp/safm.mp3 guitar`
 | 14.5 | `ltpi practice /tmp/safm.mp3 bass` | Auto-separates (takes a few minutes), then enters player |
 | 14.6 | Copy safm.mp3 to /tmp/copy.mp3, run `ltpi parts /tmp/copy.mp3` | Finds existing stems (same hash) |
 
-## 15. Error cases
+## 15. Audio device selection
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 15.1 | `ltpi separate nonexistent.mp3` | Error message about file not found (from Click) |
-| 15.2 | `ltpi practice /tmp/safm.mp3 banjo` | Error message about invalid choice (from Click) |
-| 15.3 | Uninstall ffmpeg, run any command | Error: missing required tools, lists ffmpeg with install hint |
+| 15.1 | `ltpi devices` | Lists output devices with index and name, default marked |
+| 15.2 | `ltpi practice /tmp/safm.mp3 guitar --device N` (valid index) | Plays through the selected device |
+| 15.3 | `ltpi practice /tmp/safm.mp3 guitar --device "partial name"` | Matches device by substring |
+
+## 16. Error cases
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 16.1 | `ltpi separate nonexistent.mp3` | Error message about file not found (from Click) |
+| 16.2 | `ltpi practice /tmp/safm.mp3 banjo` | Error message about invalid choice (from Click) |
+| 16.3 | Uninstall ffmpeg, run any command | Error: missing required tools, lists ffmpeg with install hint |
+| 16.4 | `ltpi practice /tmp/safm.mp3 guitar --device 999` | Error: unknown audio device, suggests `ltpi devices` |
+| 16.5 | `ltpi practice /tmp/safm.mp3 guitar --device "nonexistent"` | Error: unknown audio device, suggests `ltpi devices` |

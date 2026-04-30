@@ -16,6 +16,23 @@ def _check_prerequisites():
         )
 
 
+def _parse_device(device):
+    if device is None:
+        return None
+    import sounddevice as sd
+    try:
+        dev_id = int(device)
+    except ValueError:
+        dev_id = device
+    try:
+        info = sd.query_devices(dev_id)
+    except Exception:
+        raise click.ClickException(f"Unknown audio device: {device!r}. Run 'ltpi devices' to list available devices.")
+    if info["max_output_channels"] == 0:
+        raise click.ClickException(f"Device {device!r} has no output channels. Run 'ltpi devices' to list output devices.")
+    return dev_id
+
+
 def _validate_speed_pitch(speed, pitch):
     from .player import SPEED_MIN, SPEED_MAX, PITCH_MIN, PITCH_MAX
 
@@ -36,6 +53,17 @@ def main(ctx, stems_dir):
     if stems_dir is not None:
         from .separate import set_stems_root
         set_stems_root(stems_dir)
+
+
+@main.command()
+def devices():
+    """List available audio output devices."""
+    import sounddevice as sd
+
+    for i, dev in enumerate(sd.query_devices()):
+        if dev["max_output_channels"] > 0:
+            default = " (default)" if i == sd.default.device[1] else ""
+            click.echo(f"  {i}: {dev['name']}{default}")
 
 
 @main.command()
@@ -79,14 +107,15 @@ def parts(audio_file):
 @click.argument("part", type=click.Choice(["vocals", "drums", "bass", "guitar", "piano", "other"]))
 @click.option("--speed", type=int, default=50, help="Initial speed as percentage (default: 50)")
 @click.option("--pitch", type=int, default=0, help="Initial pitch shift in cents (default: 0)")
-def practice(audio_file, part, speed, pitch):
+@click.option("--device", type=str, default=None, help="Audio output device (name or index)")
+def practice(audio_file, part, speed, pitch, device):
     """Practice a part: isolated, starting at 50% speed."""
     _validate_speed_pitch(speed, pitch)
     from .separate import ensure_stems
     from .player import play_interactive
 
     stems_dir = ensure_stems(audio_file)
-    play_interactive(stems_dir, part, initial_mode="solo", initial_speed=speed / 100, initial_cents=pitch)
+    play_interactive(stems_dir, part, initial_mode="solo", initial_speed=speed / 100, initial_cents=pitch, device=_parse_device(device))
 
 
 @main.command()
@@ -108,11 +137,12 @@ def clean(audio_file):
 @click.argument("part", type=click.Choice(["vocals", "drums", "bass", "guitar", "piano", "other"]))
 @click.option("--speed", type=int, default=100, help="Initial speed as percentage (default: 100)")
 @click.option("--pitch", type=int, default=0, help="Initial pitch shift in cents (default: 0)")
-def play_along(audio_file, part, speed, pitch):
+@click.option("--device", type=str, default=None, help="Audio output device (name or index)")
+def play_along(audio_file, part, speed, pitch, device):
     """Play along with the song, your part removed."""
     _validate_speed_pitch(speed, pitch)
     from .separate import ensure_stems
     from .player import play_interactive
 
     stems_dir = ensure_stems(audio_file)
-    play_interactive(stems_dir, part, initial_mode="mute", initial_speed=speed / 100, initial_cents=pitch)
+    play_interactive(stems_dir, part, initial_mode="mute", initial_speed=speed / 100, initial_cents=pitch, device=_parse_device(device))

@@ -91,7 +91,7 @@ class Player:
     changes take effect within one block (~23ms) with no pause.
     """
 
-    def __init__(self, stems_dir, part, initial_mode="solo", initial_speed=0.5, initial_cents=0.0):
+    def __init__(self, stems_dir, part, initial_mode="solo", initial_speed=0.5, initial_cents=0.0, device=None):
         self.stems, self.sr = load_all_stems(stems_dir)
         self.part = part
         self.mode = initial_mode
@@ -111,6 +111,7 @@ class Player:
         self.stretcher = self._make_stretcher()
 
         self.pos_orig = 0
+        self.device = device
         self.playing = False
         self.quit = False
         self.stream = None
@@ -384,6 +385,7 @@ class Player:
             channels=self.channels,
             callback=self._callback,
             blocksize=2048,
+            device=self.device,
         )
         self.stream.start()
 
@@ -533,6 +535,6 @@ class Player:
             self._toggle_loop()
 
 
-def play_interactive(stems_dir, part, initial_mode="solo", initial_speed=0.5, initial_cents=0.0):
-    player = Player(stems_dir, part, initial_mode, initial_speed, initial_cents)
+def play_interactive(stems_dir, part, initial_mode="solo", initial_speed=0.5, initial_cents=0.0, device=None):
+    player = Player(stems_dir, part, initial_mode, initial_speed, initial_cents, device=device)
     player.run()
