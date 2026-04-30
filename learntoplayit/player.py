@@ -1,3 +1,4 @@
+import os
 import sys
 import tty
 import termios
@@ -25,6 +26,11 @@ HOLD_DURATION = 0.4
 BLOCK_SIZE = 1024
 RING_CAPACITY = 16384
 MODES = ["solo", "mute", "mix"]
+
+WAVEFORM_BLOCKS = " ▁▂▃▄▅▆▇█"
+WAVEFORM_ROWS = 8
+# status line + waveform rows + marker row
+DISPLAY_LINES = 1 + WAVEFORM_ROWS + 1
 
 
 @dataclass
@@ -99,6 +105,7 @@ class Player:
         }
         self.channels = self.mixes["solo"].shape[1] if self.mixes["solo"].ndim > 1 else 1
         self.song_len = len(self.mixes["solo"])
+        self.mix_peaks = {mode: self._compute_rms_peak(mix) for mode, mix in self.mixes.items()}
 
         self.ring = RingBuffer(RING_CAPACITY, self.channels)
         self.stretcher = self._make_stretcher()
@@ -115,6 +122,16 @@ class Player:
         self._feeder_stop = threading.Event()
         self._feeder_paused = False
         self._feeder_thread = None
+
+    def _compute_rms_peak(self, mix):
+        bin_samples = int(NUDGE_SECONDS * self.sr)
+        mono = np.abs(mix).max(axis=1) if mix.ndim > 1 else np.abs(mix.ravel())
+        n_bins = len(mono) // bin_samples
+        if n_bins == 0:
+            return 1.0
+        trimmed = mono[:n_bins * bin_samples].reshape(n_bins, bin_samples)
+        rms = np.sqrt(np.mean(trimmed ** 2, axis=1))
+        return float(rms.max()) or 1.0
 
     @property
     def _playback_pos(self):
@@ -232,7 +249,7 @@ class Player:
         m, s = divmod(secs, 60)
         return f"{int(m)}:{s:05.2f}"
 
-    def _print_status(self):
+    def _status_text(self):
         original_secs = self._playback_pos / self.sr
         total_secs = self.song_len / self.sr
         if self.hold is not None:
@@ -252,15 +269,100 @@ class Player:
         else:
             loop_str = "loop: OFF"
 
-        pos_str = self._fmt_time(original_secs)
-        tot_str = self._fmt_time(total_secs)
-        print(
-            f"\r  {state} {pos_str} / {tot_str}  |  "
+        return (
+            f"  {state} {self._fmt_time(original_secs)} / {self._fmt_time(total_secs)}  |  "
             f"speed: {speed_pct}%  |  pitch: {cents_str}c  |  "
             f"{loop_str}  |  "
-            f"mode: {self.mode}  |  part: {self.part}     ",
-            end="", flush=True,
+            f"mode: {self.mode}  |  part: {self.part}"
         )
+
+    def _waveform_bins(self, waveform_width):
+        bin_samples = int(NUDGE_SECONDS * self.sr)
+        half = waveform_width // 2
+        window_start = self._playback_pos - half * bin_samples
+
+        mix = self.mixes[self.mode]
+        end = window_start + waveform_width * bin_samples
+        pad_left = max(0, -window_start)
+        pad_right = max(0, end - self.song_len)
+        segment = mix[max(0, window_start):min(self.song_len, end)]
+        if self.channels > 1:
+            segment = np.abs(segment).max(axis=1)
+        else:
+            segment = np.abs(segment.ravel())
+        if pad_left > 0 or pad_right > 0:
+            segment = np.concatenate([
+                np.zeros(pad_left, dtype=np.float32),
+                segment,
+                np.zeros(pad_right, dtype=np.float32),
+            ])
+
+        bins = np.array([
+            np.sqrt(np.mean(segment[i * bin_samples:(i + 1) * bin_samples] ** 2))
+            for i in range(waveform_width)
+        ])
+        bins /= self.mix_peaks[self.mode]
+        np.clip(bins, 0, 1, out=bins)
+        return bins, half, window_start, bin_samples
+
+    @staticmethod
+    def _bins_to_rows(bins):
+        levels = len(WAVEFORM_BLOCKS) - 1
+        rows = []
+        for row in range(WAVEFORM_ROWS - 1, -1, -1):
+            threshold = row / WAVEFORM_ROWS
+            next_threshold = (row + 1) / WAVEFORM_ROWS
+            line = []
+            for v in bins:
+                if v >= next_threshold:
+                    line.append(WAVEFORM_BLOCKS[-1])
+                elif v > threshold:
+                    frac = (v - threshold) / (next_threshold - threshold)
+                    line.append(WAVEFORM_BLOCKS[max(1, int(frac * levels))])
+                else:
+                    line.append(" ")
+            rows.append("".join(line))
+        return rows
+
+    def _marker_line(self, width, cursor_col, window_start, bin_samples):
+        markers = [" "] * width
+        markers[cursor_col] = "↑"
+        loop = self.loop
+        if loop is not None:
+            for pos, char in [(loop.start_orig, "["), (loop.end_orig, "]")]:
+                if pos is not None:
+                    col = (pos - window_start) // bin_samples
+                    if 0 <= col < width:
+                        markers[col] = char
+        return "  " + "".join(markers)
+
+    def _print_status(self):
+        term_width = os.get_terminal_size().columns
+        status = self._status_text()[:term_width].ljust(term_width)
+
+        show_waveform = not self.playing and self.hold is None
+        waveform_width = term_width - 4
+
+        if show_waveform and waveform_width >= 10:
+            bins, cursor_col, window_start, bin_samples = self._waveform_bins(waveform_width)
+            rows = self._bins_to_rows(bins)
+            markers = self._marker_line(waveform_width, cursor_col, window_start, bin_samples)
+            body = [f"  {row}"[:term_width] for row in rows] + [markers[:term_width]]
+        else:
+            if show_waveform:
+                hint = "  (widen terminal to see waveform)"
+            elif self.hold is not None:
+                hint = "  (hold active — H to release)"
+            else:
+                hint = "  (SPACE to pause and show waveform)"
+            blank = "".ljust(term_width)
+            body = [blank] * (DISPLAY_LINES - 1)
+            body[WAVEFORM_ROWS // 2] = hint[:term_width].ljust(term_width)
+
+        assert len(body) == DISPLAY_LINES - 1
+        lines = [status] + body
+        print("\r" + "\n".join(lines), end="", flush=True)
+        print(f"\033[{DISPLAY_LINES - 1}A\r", end="", flush=True)
 
     def run(self):
         print(f"Playing: {self.part} ({self.mode})")

@@ -8,11 +8,11 @@ Unless otherwise noted, start each section from a fresh launch.
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 1.1 | Launch | Audio plays immediately. Status shows `▶`, position advances in M:SS.ss format, speed 50%, pitch 0c, loop OFF, mode solo, part guitar |
-| 1.2 | Press SPACE | Audio pauses. Status shows `⏸`. Position stops advancing |
-| 1.3 | Press SPACE | Audio resumes from where it paused |
-| 1.4 | Let it play to the end | Audio stops. Status shows `⏸` at final position |
-| 1.5 | Press 0 while paused | Position resets to 0:00.00. Stays paused |
+| 1.1 | Launch | Audio plays immediately. Status shows `▶`, position advances in M:SS.ss format, speed 50%, pitch 0c, loop OFF, mode solo, part guitar. Hint "(SPACE to pause and show waveform)" shown below status |
+| 1.2 | Press SPACE | Audio pauses. Status shows `⏸`. Waveform appears below status with `↑` playhead marker |
+| 1.3 | Press SPACE | Audio resumes from where it paused. Waveform replaced by hint |
+| 1.4 | Let it play to the end | Audio stops. Status shows `⏸` at final position. Waveform shown |
+| 1.5 | Press 0 while paused | Position resets to 0:00.00. Stays paused. Waveform updates |
 | 1.6 | Press SPACE | Audio plays from beginning |
 | 1.7 | Press 0 while playing | Position resets to 0:00.00. Continues playing |
 | 1.8 | Press Q | Player exits cleanly, terminal restored to normal |
@@ -46,8 +46,8 @@ Unless otherwise noted, start each section from a fresh launch.
 | 4.3 | Press Z | Position jumps back ~5s |
 | 4.4 | Press Z at position < 5s | Position clamps to 0:00.00, doesn't go negative |
 | 4.5 | Press V near end of track | Position clamps to end, doesn't overflow |
-| 4.6 | Press SPACE to pause, then C | Position advances 0.05s (fine nudge forward) |
-| 4.7 | Press X | Position goes back 0.05s (fine nudge backward) |
+| 4.6 | Press SPACE to pause, then C | Position advances 0.05s (fine nudge forward). Waveform shifts left by one column |
+| 4.7 | Press X | Position goes back 0.05s (fine nudge backward). Waveform shifts right by one column |
 | 4.8 | Press X at position 0:00.00 | Position stays at 0:00.00, doesn't go negative |
 
 ## 5. Mode cycling
@@ -55,7 +55,7 @@ Unless otherwise noted, start each section from a fresh launch.
 | Step | Action | Expected |
 |------|--------|----------|
 | 5.1 | Start in solo mode | Hear only the guitar part |
-| 5.2 | Press M | Mode shows "mute". Hear everything EXCEPT guitar (play-along mode) |
+| 5.2 | Press M | Mode shows "mute". Hear everything EXCEPT guitar (play-along mode). Change is instant |
 | 5.3 | Press M | Mode shows "mix". Hear full mix including guitar |
 | 5.4 | Press M | Mode shows "solo" again. Back to guitar only |
 | 5.5 | Verify position | Position should not jump on mode change |
@@ -93,61 +93,74 @@ Unless otherwise noted, start each section from a fresh launch.
 | 8.2 | Press W or S to change speed | Change is instant. Playback stays inside the loop region. Position doesn't jump outside the loop |
 | 8.3 | Verify loop boundaries | Loop still corresponds to the same section of the song (same musical content) |
 
-## 9. Loop point precision (nudge workflow)
+## 9. Loop point precision (nudge + waveform workflow)
 
 | Step | Action | Expected |
 |------|--------|----------|
 | 9.1 | Play to roughly where you want the loop start | Near the target |
-| 9.2 | Press SPACE to pause | Paused |
-| 9.3 | Press X/C to nudge to exact position | Position changes by 0.05s per press |
-| 9.4 | Press [ | Loop start set at precise position |
+| 9.2 | Press SPACE to pause | Waveform appears with `↑` playhead |
+| 9.3 | Press X/C to nudge to exact position | Waveform shifts one column per nudge. Shape stays stable |
+| 9.4 | Press [ | Loop start set. `[` marker appears in waveform display |
 | 9.5 | Press SPACE, play to near loop end | Near the end target |
-| 9.6 | Press SPACE, nudge with X/C | Fine-tune end position |
-| 9.7 | Press ] | Loop end set at precise position |
+| 9.6 | Press SPACE, nudge with X/C | Fine-tune end position using waveform |
+| 9.7 | Press ] | Loop end set. `]` marker appears in waveform display |
 | 9.8 | Press L | Loop activates. Loops precisely between the two nudged points |
 
-## 10. Hold
+## 10. Waveform display
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 10.1 | Play until an interesting note, press H | Status shows `⏺`. A short slice of audio repeats continuously |
-| 10.2 | Press E or D while holding | Pitch changes audibly on the held note |
-| 10.3 | Press W or S while holding | Speed changes audibly on the held note |
-| 10.4 | Press H again | Hold released. Playback resumes from where hold was activated. Status shows `▶` |
+| 10.1 | Play, then press SPACE | Waveform appears: 8 rows of block characters with `↑` playhead at center |
+| 10.2 | Press X/C repeatedly | Waveform scrolls smoothly, one column per nudge. Shape is stable |
+| 10.3 | Press M to change mode while paused | Waveform updates to show the new mode's audio. Amplitude scaling adjusts per mode |
+| 10.4 | Set loop start ([) and end (]) | `[` and `]` markers visible in the marker row alongside `↑` |
+| 10.5 | Press SPACE to resume | Waveform replaced by "(SPACE to pause and show waveform)" hint |
+| 10.6 | Narrow the terminal to < 14 columns, pause | "(widen terminal to see waveform)" hint shown instead of waveform |
 
-## 11. play-along command
+## 11. Hold
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 11.1 | Play until an interesting note, press H | Status shows `⏺`. A short slice of audio repeats continuously. "(hold active — H to release)" hint shown below status |
+| 11.2 | Press E or D while holding | Pitch changes audibly on the held note |
+| 11.3 | Press W or S while holding | Speed changes audibly on the held note |
+| 11.4 | Press Z/V/X/C while holding | No-ops — position doesn't change |
+| 11.5 | Press 0 while holding | No-op — position doesn't change |
+| 11.6 | Press H again | Hold released. Playback resumes from where hold was activated. Status shows `▶` |
+
+## 12. play-along command
 
 Launch with: `ltpi play-along /tmp/safm.mp3 guitar`
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 11.1 | Launch | Audio plays at 100% speed in mute mode (everything except guitar). Status shows speed 100%, mode mute |
-| 11.2 | All other controls | Work the same as in practice mode |
+| 12.1 | Launch | Audio plays at 100% speed in mute mode (everything except guitar). Status shows speed 100%, mode mute |
+| 12.2 | All other controls | Work the same as in practice mode |
 
-## 12. CLI options
-
-| Step | Action | Expected |
-|------|--------|----------|
-| 12.1 | `ltpi practice /tmp/safm.mp3 guitar --speed 70` | Starts at 70% speed |
-| 12.2 | `ltpi practice /tmp/safm.mp3 guitar --pitch -50` | Starts at -50c pitch |
-| 12.3 | `ltpi practice /tmp/safm.mp3 guitar --speed 10` | Error: speed must be between 20 and 150 |
-| 12.4 | `ltpi practice /tmp/safm.mp3 guitar --pitch 300` | Error: pitch must be between -200 and 200 |
-
-## 13. Separation and caching
+## 13. CLI options
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 13.1 | `ltpi separate /tmp/safm.mp3` (already separated) | Prints "Stems already exist", lists 6 stems |
-| 13.2 | `ltpi parts /tmp/safm.mp3` | Lists: vocals, drums, bass, guitar, piano, other |
-| 13.3 | `ltpi clean /tmp/safm.mp3` | Prints "Deleted stems for /tmp/safm.mp3" |
-| 13.4 | `ltpi clean /tmp/safm.mp3` (again) | Prints "No stems found for /tmp/safm.mp3" |
-| 13.5 | `ltpi practice /tmp/safm.mp3 bass` | Auto-separates (takes a few minutes), then enters player |
-| 13.6 | Copy safm.mp3 to /tmp/copy.mp3, run `ltpi parts /tmp/copy.mp3` | Finds existing stems (same hash) |
+| 13.1 | `ltpi practice /tmp/safm.mp3 guitar --speed 70` | Starts at 70% speed |
+| 13.2 | `ltpi practice /tmp/safm.mp3 guitar --pitch -50` | Starts at -50c pitch |
+| 13.3 | `ltpi practice /tmp/safm.mp3 guitar --speed 10` | Error: speed must be between 20 and 150 |
+| 13.4 | `ltpi practice /tmp/safm.mp3 guitar --pitch 300` | Error: pitch must be between -200 and 200 |
 
-## 14. Error cases
+## 14. Separation and caching
 
 | Step | Action | Expected |
 |------|--------|----------|
-| 14.1 | `ltpi separate nonexistent.mp3` | Error message about file not found (from Click) |
-| 14.2 | `ltpi practice /tmp/safm.mp3 banjo` | Error message about invalid choice (from Click) |
-| 14.3 | Uninstall ffmpeg, run any command | Error: missing required tools, lists ffmpeg with install hint |
+| 14.1 | `ltpi separate /tmp/safm.mp3` (already separated) | Prints "Stems already exist", lists 6 stems |
+| 14.2 | `ltpi parts /tmp/safm.mp3` | Lists: vocals, drums, bass, guitar, piano, other |
+| 14.3 | `ltpi clean /tmp/safm.mp3` | Prints "Deleted stems for /tmp/safm.mp3" |
+| 14.4 | `ltpi clean /tmp/safm.mp3` (again) | Prints "No stems found for /tmp/safm.mp3" |
+| 14.5 | `ltpi practice /tmp/safm.mp3 bass` | Auto-separates (takes a few minutes), then enters player |
+| 14.6 | Copy safm.mp3 to /tmp/copy.mp3, run `ltpi parts /tmp/copy.mp3` | Finds existing stems (same hash) |
+
+## 15. Error cases
+
+| Step | Action | Expected |
+|------|--------|----------|
+| 15.1 | `ltpi separate nonexistent.mp3` | Error message about file not found (from Click) |
+| 15.2 | `ltpi practice /tmp/safm.mp3 banjo` | Error message about invalid choice (from Click) |
+| 15.3 | Uninstall ffmpeg, run any command | Error: missing required tools, lists ffmpeg with install hint |
