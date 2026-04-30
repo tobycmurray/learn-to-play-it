@@ -175,14 +175,16 @@ class PlayerWidget(QWidget):
     def _build_seek(self, layout):
         row = QHBoxLayout()
 
+        seek = f"{SEEK_SECONDS:g}s"
+        nudge = f"{NUDGE_SECONDS:g}s"
         for label, seconds in [
-            ("«  −5s  [Z]", -SEEK_SECONDS),
-            ("‹  −0.05s  [X]", -NUDGE_SECONDS),
-            ("›  +0.05s  [C]", NUDGE_SECONDS),
-            ("»  +5s  [V]", SEEK_SECONDS),
+            (f"«  −{seek}  [Z]", -SEEK_SECONDS),
+            (f"‹  −{nudge}  [X]", -NUDGE_SECONDS),
+            (f"›  +{nudge}  [C]", NUDGE_SECONDS),
+            (f"»  +{seek}  [V]", SEEK_SECONDS),
         ]:
             btn = QPushButton(label)
-            btn.setFixedHeight(32)
+            btn.setFixedHeight(40)
             btn.clicked.connect(lambda _, s=seconds: self._cmd(lambda p: p.seek(s)))
             row.addWidget(btn)
 
@@ -224,14 +226,17 @@ class PlayerWidget(QWidget):
         row.addWidget(QLabel("Loop"))
 
         start_btn = QPushButton("[  Start")
+        start_btn.setFixedHeight(40)
         start_btn.clicked.connect(lambda: self._cmd(lambda p: p.set_loop_start()))
         row.addWidget(start_btn)
 
         end_btn = QPushButton("]  End")
+        end_btn.setFixedHeight(40)
         end_btn.clicked.connect(lambda: self._cmd(lambda p: p.set_loop_end()))
         row.addWidget(end_btn)
 
         self.loop_btn = QPushButton("OFF  [L]")
+        self.loop_btn.setFixedHeight(40)
         self.loop_btn.setFixedWidth(80)
         self.loop_btn.clicked.connect(lambda: self._cmd(lambda p: p.toggle_loop()))
         row.addWidget(self.loop_btn)
@@ -248,6 +253,7 @@ class PlayerWidget(QWidget):
         row.addWidget(QLabel("Mode"))
 
         self.mode_btn = QPushButton("solo  [M]")
+        self.mode_btn.setFixedHeight(40)
         self.mode_btn.setFixedWidth(100)
         self.mode_btn.clicked.connect(lambda: self._cmd(lambda p: p.change_mode()))
         row.addWidget(self.mode_btn)
