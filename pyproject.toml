@@ -32,3 +32,6 @@ include = ["learntoplayit*"]
 
 [project.scripts]
 ltpi = "learntoplayit.cli:main"
+
+[project.gui-scripts]
+ltpi-gui = "learntoplayit.app:main"

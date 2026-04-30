@@ -1,5 +1,3 @@
-import sys
-
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut, QPainter, QColor, QPen
 from PySide6.QtWidgets import (
@@ -23,9 +21,9 @@ MONO_FONT = "'Menlo', 'Courier New', monospace"
 
 class WaveformWidget(QWidget):
 
-    def __init__(self, player):
+    def __init__(self):
         super().__init__()
-        self.player = player
+        self.player = None
         self.setMinimumHeight(120)
 
     def paintEvent(self, event):
@@ -36,7 +34,7 @@ class WaveformWidget(QWidget):
 
         painter.fillRect(0, 0, w, h, WAVEFORM_BG)
 
-        if w < 10:
+        if self.player is None or w < 10:
             painter.end()
             return
 
@@ -72,36 +70,36 @@ class WaveformWidget(QWidget):
         painter.end()
 
 
-class GuiDisplay(QMainWindow):
+class PlayerWidget(QWidget):
 
-    def __init__(self, player):
-        self.app = QApplication.instance() or QApplication(sys.argv)
-        super().__init__()
-        self.player = player
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.player = None
 
-        self.setWindowTitle(f"ltpi — {player.part}")
-        self.setMinimumWidth(480)
-
-        central = QWidget()
-        self.setCentralWidget(central)
-        layout = QVBoxLayout(central)
+        layout = QVBoxLayout(self)
         layout.setSpacing(12)
         layout.setContentsMargins(20, 20, 20, 20)
 
         self._build_status(layout)
         self._build_transport(layout)
         self._build_waveform(layout)
-        self.speed_label = self._build_adjuster(layout, "Speed", SPEED_STEP, player.change_speed, "S", "W", width=60)
-        self.pitch_label = self._build_adjuster(layout, "Pitch", PITCH_STEP, player.change_pitch, "D", "E", width=90)
+        self.speed_label = self._build_adjuster(layout, "Speed", SPEED_STEP, lambda d: self._cmd(lambda p: p.change_speed(d)), "S", "W", width=60)
+        self.pitch_label = self._build_adjuster(layout, "Pitch", PITCH_STEP, lambda d: self._cmd(lambda p: p.change_pitch(d)), "D", "E", width=90)
         self._build_loop(layout)
         self._build_mode(layout)
 
-        self._bind_keys()
-
         self._timer = QTimer()
         self._timer.timeout.connect(self._refresh)
+        self._timer.start(50)
 
-    # --- UI construction ---
+    def _cmd(self, fn):
+        if self.player is not None:
+            fn(self.player)
+
+    def set_player(self, player):
+        self.player = player
+        self.waveform.player = player
+        self.part_label.setText(f"part: {player.part}")
 
     def _build_status(self, layout):
         self.status_label = QLabel("⏸  0:00.00 / 0:00.00")
@@ -113,23 +111,23 @@ class GuiDisplay(QMainWindow):
 
         self.play_btn = QPushButton("▶  Play  [Space]")
         self.play_btn.setFixedHeight(40)
-        self.play_btn.clicked.connect(lambda: self.player.toggle_play())
+        self.play_btn.clicked.connect(lambda: self._cmd(lambda p: p.toggle_play()))
         row.addWidget(self.play_btn)
 
         restart_btn = QPushButton("⏮  Restart  [0]")
         restart_btn.setFixedHeight(40)
-        restart_btn.clicked.connect(lambda: self.player.restart())
+        restart_btn.clicked.connect(lambda: self._cmd(lambda p: p.restart()))
         row.addWidget(restart_btn)
 
         self.hold_btn = QPushButton("⏺  Hold  [H]")
         self.hold_btn.setFixedHeight(40)
-        self.hold_btn.clicked.connect(lambda: self.player.toggle_hold())
+        self.hold_btn.clicked.connect(lambda: self._cmd(lambda p: p.toggle_hold()))
         row.addWidget(self.hold_btn)
 
         layout.addLayout(row)
 
     def _build_waveform(self, layout):
-        self.waveform = WaveformWidget(self.player)
+        self.waveform = WaveformWidget()
         layout.addWidget(self.waveform)
 
     @staticmethod
@@ -167,16 +165,16 @@ class GuiDisplay(QMainWindow):
         row.addWidget(QLabel("Loop"))
 
         start_btn = QPushButton("[  Start")
-        start_btn.clicked.connect(lambda: self.player.set_loop_start())
+        start_btn.clicked.connect(lambda: self._cmd(lambda p: p.set_loop_start()))
         row.addWidget(start_btn)
 
         end_btn = QPushButton("]  End")
-        end_btn.clicked.connect(lambda: self.player.set_loop_end())
+        end_btn.clicked.connect(lambda: self._cmd(lambda p: p.set_loop_end()))
         row.addWidget(end_btn)
 
         self.loop_btn = QPushButton("OFF  [L]")
         self.loop_btn.setFixedWidth(80)
-        self.loop_btn.clicked.connect(lambda: self.player.toggle_loop())
+        self.loop_btn.clicked.connect(lambda: self._cmd(lambda p: p.toggle_loop()))
         row.addWidget(self.loop_btn)
 
         self.loop_label = QLabel("")
@@ -192,44 +190,20 @@ class GuiDisplay(QMainWindow):
 
         self.mode_btn = QPushButton("solo  [M]")
         self.mode_btn.setFixedWidth(100)
-        self.mode_btn.clicked.connect(lambda: self.player.change_mode())
+        self.mode_btn.clicked.connect(lambda: self._cmd(lambda p: p.change_mode()))
         row.addWidget(self.mode_btn)
 
-        self.part_label = QLabel(f"part: {self.player.part}")
+        self.part_label = QLabel("")
         self.part_label.setStyleSheet("color: gray;")
         row.addWidget(self.part_label)
 
         row.addStretch()
         layout.addLayout(row)
 
-    # --- Keyboard shortcuts ---
-
-    def _bind_keys(self):
-        shortcuts = {
-            Qt.Key_Space: lambda: self.player.toggle_play(),
-            Qt.Key_Q: self.close,
-            Qt.Key_0: lambda: self.player.restart(),
-            Qt.Key_W: lambda: self.player.change_speed(SPEED_STEP),
-            Qt.Key_S: lambda: self.player.change_speed(-SPEED_STEP),
-            Qt.Key_E: lambda: self.player.change_pitch(PITCH_STEP),
-            Qt.Key_D: lambda: self.player.change_pitch(-PITCH_STEP),
-            Qt.Key_Z: lambda: self.player.seek(-SEEK_SECONDS),
-            Qt.Key_X: lambda: self.player.seek(-NUDGE_SECONDS),
-            Qt.Key_C: lambda: self.player.seek(NUDGE_SECONDS),
-            Qt.Key_V: lambda: self.player.seek(SEEK_SECONDS),
-            Qt.Key_M: lambda: self.player.change_mode(),
-            Qt.Key_H: lambda: self.player.toggle_hold(),
-            Qt.Key_L: lambda: self.player.toggle_loop(),
-            Qt.Key_BracketLeft: lambda: self.player.set_loop_start(),
-            Qt.Key_BracketRight: lambda: self.player.set_loop_end(),
-        }
-        for key, fn in shortcuts.items():
-            QShortcut(QKeySequence(key), self).activated.connect(fn)
-
-    # --- Refresh ---
-
     def _refresh(self):
         p = self.player
+        if p is None:
+            return
 
         if p.hold is not None:
             state = "⏺"
@@ -258,7 +232,45 @@ class GuiDisplay(QMainWindow):
 
         self.waveform.update()
 
-    # --- Lifecycle ---
+
+class GuiDisplay(QMainWindow):
+    """Standalone window for --gui CLI mode."""
+
+    def __init__(self, player):
+        self.app = QApplication.instance() or QApplication([])
+        super().__init__()
+        self.player = player
+
+        self.setWindowTitle(f"ltpi — {player.part}")
+        self.setMinimumWidth(480)
+
+        self.player_widget = PlayerWidget()
+        self.setCentralWidget(self.player_widget)
+        self.player_widget.set_player(player)
+
+        self._bind_keys()
+
+    def _bind_keys(self):
+        shortcuts = {
+            Qt.Key_Space: lambda: self.player.toggle_play(),
+            Qt.Key_Q: self.close,
+            Qt.Key_0: lambda: self.player.restart(),
+            Qt.Key_W: lambda: self.player.change_speed(SPEED_STEP),
+            Qt.Key_S: lambda: self.player.change_speed(-SPEED_STEP),
+            Qt.Key_E: lambda: self.player.change_pitch(PITCH_STEP),
+            Qt.Key_D: lambda: self.player.change_pitch(-PITCH_STEP),
+            Qt.Key_Z: lambda: self.player.seek(-SEEK_SECONDS),
+            Qt.Key_X: lambda: self.player.seek(-NUDGE_SECONDS),
+            Qt.Key_C: lambda: self.player.seek(NUDGE_SECONDS),
+            Qt.Key_V: lambda: self.player.seek(SEEK_SECONDS),
+            Qt.Key_M: lambda: self.player.change_mode(),
+            Qt.Key_H: lambda: self.player.toggle_hold(),
+            Qt.Key_L: lambda: self.player.toggle_loop(),
+            Qt.Key_BracketLeft: lambda: self.player.set_loop_start(),
+            Qt.Key_BracketRight: lambda: self.player.set_loop_end(),
+        }
+        for key, fn in shortcuts.items():
+            QShortcut(QKeySequence(key), self).activated.connect(fn)
 
     def closeEvent(self, event):
         self.player.quit = True
@@ -267,9 +279,8 @@ class GuiDisplay(QMainWindow):
     def run(self):
         self.player.start()
         self.show()
-        self._timer.start(50)
         try:
             self.app.exec()
         finally:
-            self._timer.stop()
+            self.player_widget._timer.stop()
             self.player.stop()
