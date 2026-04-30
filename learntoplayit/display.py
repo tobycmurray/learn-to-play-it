@@ -7,6 +7,7 @@ import select
 from .player import (
     SPEED_STEP, PITCH_STEP, SEEK_SECONDS, NUDGE_SECONDS,
 )
+from .fmt import fmt_time, fmt_pitch
 
 WAVEFORM_BLOCKS = " ▁▂▃▄▅▆▇█"
 WAVEFORM_ROWS = 8
@@ -48,15 +49,8 @@ class TerminalDisplay:
             p.stop()
             print()
 
-    @staticmethod
-    def _fmt_time(secs):
-        m, s = divmod(secs, 60)
-        return f"{int(m)}:{s:05.2f}"
-
     def _status_text(self):
         p = self.player
-        pos_secs = p.playback_position
-        total_secs = p.song_duration
 
         if p.hold is not None:
             state = "⏺"
@@ -66,27 +60,17 @@ class TerminalDisplay:
             state = "⏸"
         speed_pct = int(round(p.speed * 100))
 
-        c = round(p.cents)
-        if c == 0:
-            cents_str = "0c"
-        elif abs(c) < 100:
-            cents_str = f"{c:+}c"
-        else:
-            st = int(c / 100)
-            rem = c - st * 100
-            cents_str = f"{st:+}st" if rem == 0 else f"{st:+}st{rem:+}c"
-
         bounds = p.loop_bounds
         if bounds is not None and (bounds[0] is not None or bounds[1] is not None):
-            ls_str = self._fmt_time(bounds[0]) if bounds[0] is not None else "?"
-            le_str = self._fmt_time(bounds[1]) if bounds[1] is not None else "?"
+            ls_str = fmt_time(bounds[0]) if bounds[0] is not None else "?"
+            le_str = fmt_time(bounds[1]) if bounds[1] is not None else "?"
             loop_str = f"loop: {'ON' if bounds[2] else 'OFF'} {ls_str}-{le_str}"
         else:
             loop_str = "loop: OFF"
 
         return (
-            f"  {state} {self._fmt_time(pos_secs)} / {self._fmt_time(total_secs)}  |  "
-            f"speed: {speed_pct}%  |  pitch: {cents_str}  |  "
+            f"  {state} {fmt_time(p.playback_position)} / {fmt_time(p.song_duration)}  |  "
+            f"speed: {speed_pct}%  |  pitch: {fmt_pitch(p.cents)}  |  "
             f"{loop_str}  |  "
             f"mode: {p.mode}  |  part: {p.part}"
         )

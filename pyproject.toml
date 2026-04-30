@@ -19,6 +19,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+gui = [
+    "PySide6",
+]
 test = [
     "pytest",
     "pytest-timeout",

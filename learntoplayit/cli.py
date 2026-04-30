@@ -33,6 +33,15 @@ def _parse_device(device):
     return dev_id
 
 
+def _run_display(player, gui):
+    if gui:
+        from .gui import GuiDisplay
+        GuiDisplay(player).run()
+    else:
+        from .display import TerminalDisplay
+        TerminalDisplay(player).run()
+
+
 def _validate_speed_pitch(speed, pitch):
     from .player import SPEED_MIN, SPEED_MAX, PITCH_MIN, PITCH_MAX
 
@@ -108,14 +117,16 @@ def parts(audio_file):
 @click.option("--speed", type=int, default=50, help="Initial speed as percentage (default: 50)")
 @click.option("--pitch", type=int, default=0, help="Initial pitch shift in cents (default: 0)")
 @click.option("--device", type=str, default=None, help="Audio output device (name or index)")
-def practice(audio_file, part, speed, pitch, device):
+@click.option("--gui", is_flag=True, default=False, help="Launch graphical interface")
+def practice(audio_file, part, speed, pitch, device, gui):
     """Practice a part: isolated, starting at 50% speed."""
     _validate_speed_pitch(speed, pitch)
     from .separate import ensure_stems
-    from .player import play_interactive
+    from .player import Player
 
     stems_dir = ensure_stems(audio_file)
-    play_interactive(stems_dir, part, initial_mode="solo", initial_speed=speed / 100, initial_cents=pitch, device=_parse_device(device))
+    player = Player(stems_dir, part, initial_mode="solo", initial_speed=speed / 100, initial_cents=pitch, device=_parse_device(device))
+    _run_display(player, gui)
 
 
 @main.command()
@@ -138,11 +149,13 @@ def clean(audio_file):
 @click.option("--speed", type=int, default=100, help="Initial speed as percentage (default: 100)")
 @click.option("--pitch", type=int, default=0, help="Initial pitch shift in cents (default: 0)")
 @click.option("--device", type=str, default=None, help="Audio output device (name or index)")
-def play_along(audio_file, part, speed, pitch, device):
+@click.option("--gui", is_flag=True, default=False, help="Launch graphical interface")
+def play_along(audio_file, part, speed, pitch, device, gui):
     """Play along with the song, your part removed."""
     _validate_speed_pitch(speed, pitch)
     from .separate import ensure_stems
-    from .player import play_interactive
+    from .player import Player
 
     stems_dir = ensure_stems(audio_file)
-    play_interactive(stems_dir, part, initial_mode="mute", initial_speed=speed / 100, initial_cents=pitch, device=_parse_device(device))
+    player = Player(stems_dir, part, initial_mode="mute", initial_speed=speed / 100, initial_cents=pitch, device=_parse_device(device))
+    _run_display(player, gui)

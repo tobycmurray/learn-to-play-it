@@ -249,7 +249,8 @@ class Player:
     def waveform_bins(self, num_bins):
         bin_samples = int(NUDGE_SECONDS * self.sr)
         half = num_bins // 2
-        window_start = self._playback_pos - half * bin_samples
+        pos_snapped = (self._playback_pos // bin_samples) * bin_samples
+        window_start = pos_snapped - half * bin_samples
 
         mix = self.mixes[self.mode]
         end = window_start + num_bins * bin_samples
