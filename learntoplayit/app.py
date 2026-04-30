@@ -309,8 +309,8 @@ class AppWindow(QMainWindow):
         self.welcome.hide()
         self.player_widget.show()
 
-        filename = Path(audio_file).stem
-        self.setWindowTitle(f"ltpi — {filename} — {part}")
+        filename = Path(audio_file).name
+        self.setWindowTitle(f"Learn To Play It — {filename} — {part}")
 
     def closeEvent(self, event):
         if self.player is not None:
