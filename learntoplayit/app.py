@@ -305,6 +305,7 @@ class AppWindow(QMainWindow):
         self.player = Player(stems_dir, part, initial_mode=mode, initial_speed=speed, initial_cents=pitch)
         self.player_widget.set_player(self.player)
         self.player.start()
+        self.player_widget._timer.start(50)
 
         self.welcome.hide()
         self.player_widget.show()
