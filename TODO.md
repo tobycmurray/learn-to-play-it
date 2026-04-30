@@ -8,4 +8,4 @@
 
 ## GUI Polish
 - Improve visual styling of the player interface
-- Delete `FUTURE.md` (all items implemented)
+- Document GUI in README once styling is presentable (`pip install learn-to-play-it[gui]`, `ltpi-gui`)
