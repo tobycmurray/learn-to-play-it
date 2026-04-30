@@ -82,6 +82,24 @@ These keys follow a visual layout, shown below:
 
 ```
 
+A waveform is rendered when playback is paused, allowing precise control of loop start and end points:
+```
+Playing: bass (solo)
+Controls: SPACE=play/pause  W/S=speed  E/D=pitch  Z/X/C/V=seek  H=hold
+          [/]=loop start/end  L=loop  M=mode  0=restart  Q=quit
+
+  ⏸ 0:14.32 / 2:43.27  |  speed: 100%  |  pitch: 0c  |  loop: ON 0:11.55-0:16.55  |  mode: solo  |  part: bass            
+                                                                                                                          
+                                                                                                                          
+                                      ▄▂                              ▁      ▁                                            
+                                ▅▇▆▆▃ ██▇▅▁                           █▂▂▁  ▁█▃      ▁  ▁           ▂      ▁ ▁            
+      ▁▆▃▁            ▁  ▂▃▃▃▂  █████ █████▇▇▄▃ ▁▁  ▄▂   ▁▁    ▂▁    ▄████▅ ███▂▂▁▁  █▅ █▄▂▁  ▇▆▄▁  █▆▄▁▁▁▄█▆█▄▂   ▃▁▁▁   
+      ████▆▃▅▄▁▃▁    ▅█▇▃█████▆ █████▆█████████▁██▆▄██▃  ██▆▃▁▃██▇▃▁ ██████▄███████▆▁██▇████▅▇████▆▇████████████▇▇▇████▇  
+      ███████████▇▃▅▆██████████▃███████████████████████ ▁███████████ ███████████████████████████████████████████████████  
+  ▁▁▁▁█████████████████████████████████████████████████▆████████████▅███████████████████████████████████████████████████  
+     [                                                       ↑                                           ]                
+```
+
 **Modes** (cycled with `M`):
 - **solo** — hear only the selected part
 - **mute** — hear everything *except* the selected part (play-along)
