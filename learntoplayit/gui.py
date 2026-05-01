@@ -24,21 +24,30 @@ WAVEFORM_BG = QColor(30, 30, 35)
 WAVEFORM_PAD = 4
 MONO_FONT = "'Menlo', 'Courier New', monospace"
 
+BUTTON_H = 38
+TRANSPORT_W = 160
+SEEK_W = 120
+LOOP_W = 170
+SLIDER_W = 64
+
+
 
 class ActionButton(QPushButton):
 
     def __init__(self, action, key, parent=None, minWidth=200):
         super().__init__(parent)
-        self.setFixedHeight(40)
+        self.setFixedSize(minWidth, BUTTON_H)
         btn_layout = QHBoxLayout(self)
         btn_layout.setContentsMargins(12, 0, 12, 0)
         self._action_label = QLabel(action)
+        self._action_label.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
         btn_layout.addWidget(self._action_label)
         btn_layout.addStretch()
         self._key_label = QLabel(key)
         self._key_label.setStyleSheet("color: gray;")
+        self._key_label.setFixedWidth(44)
+        self._key_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         btn_layout.addWidget(self._key_label)
-        self.setMinimumWidth(minWidth)
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
     def set_action(self, text):
@@ -50,7 +59,8 @@ class WaveformWidget(QWidget):
     def __init__(self):
         super().__init__()
         self.player = None
-        self.setMinimumHeight(120)
+        self.setMinimumHeight(220)
+        self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
     def paintEvent(self, event):
         w = self.width()
@@ -116,6 +126,7 @@ class SliderControl(QWidget):
     def __init__(self, label, min_val, max_val, step, key_down, key_up, format_fn):
         super().__init__()
         self._format_fn = format_fn
+        self.setFixedWidth(SLIDER_W)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -197,35 +208,44 @@ class PlayerWidget(QWidget):
     def _build_transport(self, layout):
         row = QHBoxLayout()
 
-        self.play_btn = ActionButton("▶ Play", "Space", minWidth=150)
+        row.addStretch()
+
+        self.play_btn = ActionButton("▶ Play", "Space", minWidth=TRANSPORT_W)
         self.play_btn.clicked.connect(lambda: self._cmd(lambda p: p.toggle_play()))
         row.addWidget(self.play_btn)
+        row.addSpacing(28)
 
-        restart_btn = ActionButton("⏮ Restart", "0", minWidth=150)
+        restart_btn = ActionButton("⏮ Restart", "0", minWidth=TRANSPORT_W)
         restart_btn.clicked.connect(lambda: self._cmd(lambda p: p.restart()))
         row.addWidget(restart_btn)
+        row.addSpacing(28)
 
-        self.hold_btn = ActionButton("⏺ Hold", "H", minWidth=150)
+        self.hold_btn = ActionButton("⏺ Hold", "H", minWidth=TRANSPORT_W)
         self.hold_btn.clicked.connect(lambda: self._cmd(lambda p: p.toggle_hold()))
         row.addWidget(self.hold_btn)
 
+        row.addStretch()
         layout.addLayout(row)
 
     def _build_seek(self, layout):
         row = QHBoxLayout()
+        row.addStretch()
 
         seek = f"{SEEK_SECONDS:g}s"
         nudge = f"{NUDGE_SECONDS:g}s"
-        for action, key, seconds in [
+        for idx, (action, key, seconds) in enumerate([
             (f"« −{seek}", "Z", -SEEK_SECONDS),
             (f"‹ −{nudge}", "X", -NUDGE_SECONDS),
             (f"› +{nudge}", "C", NUDGE_SECONDS),
             (f"» +{seek}", "V", SEEK_SECONDS),
-        ]:
-            btn = ActionButton(action, key, minWidth=100)
+        ]):
+            if idx:
+                row.addSpacing(20)
+            btn = ActionButton(action, key, minWidth=SEEK_W)
             btn.clicked.connect(lambda _, s=seconds: self._cmd(lambda p: p.seek(s)))
             row.addWidget(btn)
 
+        row.addStretch()
         layout.addLayout(row)
 
     def _build_center(self, layout):
@@ -233,6 +253,7 @@ class PlayerWidget(QWidget):
 
         self.waveform = WaveformWidget()
         row.addWidget(self.waveform, stretch=1)
+        row.addSpacing(18)
 
         self.speed_slider = SliderControl(
             "Speed", int(SPEED_MIN * 100), int(SPEED_MAX * 100),
@@ -242,6 +263,7 @@ class PlayerWidget(QWidget):
             lambda v: self._cmd(lambda p: p.change_speed(v / 100 - p.speed))
         )
         row.addWidget(self.speed_slider)
+        row.addSpacing(12)
 
         self.pitch_slider = SliderControl(
             "Pitch", PITCH_MIN, PITCH_MAX,
@@ -262,22 +284,21 @@ class PlayerWidget(QWidget):
 
         row = QHBoxLayout()
 
-        start_btn = ActionButton("Set Loop Start", "[")
+        start_btn = ActionButton("Set Loop Start", "[", minWidth=LOOP_W)
         start_btn.clicked.connect(lambda: self._cmd(lambda p: p.set_loop_start()))
-        start_btn.setMinimumWidth(160)
         row.addWidget(start_btn)
 
-        end_btn = ActionButton("Set Loop End", "]")
+        end_btn = ActionButton("Set Loop End", "]", minWidth=LOOP_W)
         end_btn.clicked.connect(lambda: self._cmd(lambda p: p.set_loop_end()))
-        end_btn.setMinimumWidth(160)
         row.addWidget(end_btn)
 
-        self.loop_btn = ActionButton("Enable Loop", "L")
-        self.loop_btn.setMinimumWidth(160)
+        self.loop_btn = ActionButton("Enable Loop", "L", minWidth=LOOP_W)
         self.loop_btn.clicked.connect(lambda: self._cmd(lambda p: p.toggle_loop()))
         row.addWidget(self.loop_btn)
+        row.addSpacing(16)
 
         self.loop_status = QLabel("")
+        self.loop_status.setMinimumWidth(90)
         row.addWidget(self.loop_status)
 
         self.loop_label = QLabel("")
@@ -285,20 +306,19 @@ class PlayerWidget(QWidget):
         self.loop_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         row.addWidget(self.loop_label, 1)
 
-        row.addStretch()
         layout.addLayout(row)
 
     def _build_mode(self, layout):
         row = QHBoxLayout()
 
-        self.mode_btn = ActionButton("Change Mode", "M")
-        self.mode_btn.setMinimumWidth(160)
-        self.mode_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.mode_btn = ActionButton("Change Mode", "M", minWidth=LOOP_W)
         self.mode_btn.clicked.connect(lambda: self._cmd(lambda p: p.change_mode()))
         row.addWidget(self.mode_btn)
+        row.addSpacing(16)
 
         self.mode_label = QLabel("")
         row.addWidget(self.mode_label)
+        row.addSpacing(12)
 
         self.part_label = QLabel("")
         self.part_label.setStyleSheet("color: gray;")
