@@ -49,6 +49,15 @@ class LoopRegion:
     def is_complete(self) -> bool:
         return self.start_orig is not None and self.end_orig is not None
 
+    def active_bounds(self) -> tuple[int, int] | None:
+        """Returns (start_orig, end_orig) if active, else None.
+
+        When active, both bounds are guaranteed non-None by _enforce().
+        """
+        if self.active:
+            return self.start_orig, self.end_orig
+        return None
+
 
 @dataclass
 class HoldState:
@@ -131,6 +140,11 @@ class Player:
         return self.song_len / self.sr
 
     @property
+    def loop_active(self):
+        loop = self.loop
+        return loop is not None and loop.active
+
+    @property
     def loop_bounds(self):
         """Loop info: (start_secs|None, end_secs|None, active), or None if no loop."""
         loop = self.loop
@@ -143,7 +157,13 @@ class Player:
     @property
     def _playback_pos(self):
         buffered_orig = int(self.ring.available() * self.speed)
-        return max(0, self.pos_orig - buffered_orig)
+        pos = max(0, self.pos_orig - buffered_orig)
+        if self.loop_active:
+            start, end = self.loop.active_bounds()
+            loop_len = end - start
+            if loop_len > 0:
+                pos = start + (pos - start) % loop_len
+        return pos
 
     @property
     def _time_ratio(self):
@@ -187,15 +207,12 @@ class Player:
 
             mix = self.mixes[self.mode]
             pos = self.pos_orig
-            end_pos = self.song_len
-
-            loop = self.loop
-            if loop is not None and loop.active and loop.end_orig is not None:
-                end_pos = loop.end_orig
+            bounds = self.loop.active_bounds() if self.loop_active else None
+            end_pos = bounds[1] if bounds else self.song_len
 
             if pos >= end_pos:
-                if loop is not None and loop.active and loop.start_orig is not None:
-                    self.pos_orig = loop.start_orig
+                if bounds:
+                    self.pos_orig = bounds[0]
                     continue
                 self._feeder_stop.wait(0.01)
                 continue
@@ -289,8 +306,7 @@ class Player:
                 if 0 <= col < num_bins:
                     loop_end_col = col
 
-        active = loop is not None and loop.active
-        return WaveformData(bins=bins, cursor_col=half, loop_start_col=loop_start_col, loop_end_col=loop_end_col, loop_active=active)
+        return WaveformData(bins=bins, cursor_col=half, loop_start_col=loop_start_col, loop_end_col=loop_end_col, loop_active=self.loop_active)
 
     # --- Commands ---
 
@@ -321,9 +337,9 @@ class Player:
         delta_orig = int(seconds * self.sr)
         new_pos = self._playback_pos + delta_orig
 
-        loop = self.loop
-        if loop is not None and loop.active and loop.end_orig is not None:
-            new_pos = max(loop.start_orig, min(new_pos, loop.end_orig - 1))
+        bounds = self.loop.active_bounds() if self.loop_active else None
+        if bounds:
+            new_pos = max(bounds[0], min(new_pos, bounds[1] - 1))
         else:
             new_pos = max(0, min(new_pos, self.song_len - 1))
 
@@ -372,11 +388,8 @@ class Player:
     def restart(self):
         if self.hold is not None:
             return
-        loop = self.loop
-        if loop is not None and loop.active:
-            self.pos_orig = loop.start_orig
-        else:
-            self.pos_orig = 0
+        bounds = self.loop.active_bounds() if self.loop_active else None
+        self.pos_orig = bounds[0] if bounds else 0
         self._seek_requested = True
 
     def _process_hold_raw(self, raw: np.ndarray) -> np.ndarray:

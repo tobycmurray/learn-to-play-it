@@ -317,6 +317,10 @@ class PlayerWidget(QWidget):
         self.hold_btn.set_action("⏺ Release" if p.hold is not None else "⏺ Hold")
         self.mode_label.setText(f"<b>Playback Mode:</b> {p.mode}")
 
+        loop = p.loop
+        can_toggle = loop is not None and loop.is_complete()
+        self.loop_btn.setEnabled(can_toggle)
+
         bounds = p.loop_bounds
         if bounds is not None and (bounds[0] is not None or bounds[1] is not None):
             ls = fmt_time(bounds[0]) if bounds[0] is not None else "?"
