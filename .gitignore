@@ -8,3 +8,7 @@ build/
 *.mp3
 .pytest_cache/
 .DS_Store
+*~
+.build-venv/
+packaging/macos/AppIcon.icns
+*.m4a

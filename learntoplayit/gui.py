@@ -24,9 +24,13 @@ WAVEFORM_BG = QColor(30, 30, 35)
 WAVEFORM_PAD = 4
 MONO_FONT = "'Menlo', 'Courier New', monospace"
 
-BUTTON_H = 38
-TRANSPORT_W = 160
-SEEK_W = 120
+TRANSPORT_W = 200
+BUTTON_H = 44
+
+#BUTTON_H = 38
+#TRANSPORT_W = 160
+
+SEEK_W = 140
 LOOP_W = 170
 SLIDER_W = 64
 
@@ -44,11 +48,32 @@ class ActionButton(QPushButton):
         btn_layout.addWidget(self._action_label)
         btn_layout.addStretch()
         self._key_label = QLabel(key)
-        self._key_label.setStyleSheet("color: gray;")
+        self._key_label.setStyleSheet("color: #8b8f98; font-size: 13px;")
+        #self._key_label.setStyleSheet("color: gray;")
         self._key_label.setFixedWidth(44)
         self._key_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         btn_layout.addWidget(self._key_label)
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self.setStyleSheet("""
+        ActionButton {
+        //background: #2b2d31;
+        //color: #f2f2f2;
+        border: 1px solid #3f4248;
+        border-radius: 8px;
+        font-size: 15px;
+        }
+        ActionButton:hover {
+        background: #343740;
+    }
+        ActionButton:pressed {
+        background: #1f2126;
+        }
+        ActionButton:disabled {
+        background: #24262a;
+        color: #777;
+        border-color: #333;
+        }
+        """)
 
     def set_action(self, text):
         self._action_label.setText(text)
@@ -234,10 +259,10 @@ class PlayerWidget(QWidget):
         seek = f"{SEEK_SECONDS:g}s"
         nudge = f"{NUDGE_SECONDS:g}s"
         for idx, (action, key, seconds) in enumerate([
-            (f"« −{seek}", "Z", -SEEK_SECONDS),
-            (f"‹ −{nudge}", "X", -NUDGE_SECONDS),
-            (f"› +{nudge}", "C", NUDGE_SECONDS),
-            (f"» +{seek}", "V", SEEK_SECONDS),
+            (f"⏪  {seek}", "Z", -SEEK_SECONDS),
+            (f"⏴  {nudge}", "X", -NUDGE_SECONDS),
+            (f"⏵  {nudge}", "C", NUDGE_SECONDS),
+            (f"⏩ {seek}", "V", SEEK_SECONDS),
         ]):
             if idx:
                 row.addSpacing(20)
@@ -376,8 +401,8 @@ class GuiDisplay(QMainWindow):
         self.player = player
 
         self.setWindowTitle(f"ltpi — {player.part}")
-        self.setMinimumWidth(800)
-        self.resize(800, 600)
+        self.setMinimumWidth(900)
+        self.resize(900, 600)
 
         self.player_widget = PlayerWidget()
         self.setCentralWidget(self.player_widget)

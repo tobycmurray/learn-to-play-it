@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QAction, QKeySequence, QShortcut
+from PySide6.QtGui import QAction, QKeySequence, QShortcut, QPalette, QColor
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QHBoxLayout,
@@ -28,7 +28,7 @@ APP_NAME = "Learn To Play It"
 def add_bundled_bin_to_path():
     if getattr(sys, "frozen", False):
         exe_dir = Path(sys.executable).resolve().parent
-        bundled_bin = exe_dir.parent / "Resources" / "bin"
+        bundled_bin = exe_dir.parent / "Frameworks" / "bin"
 
         if bundled_bin.exists():
             os.environ["PATH"] = str(bundled_bin) + os.pathsep + os.environ.get("PATH", "")
@@ -353,6 +353,19 @@ def main():
 
     app = QApplication(sys.argv)
     app.setStyle("fusion")
+
+    # app colour palette
+    palette = QPalette()
+    palette.setColor(QPalette.Window, QColor("#181a1f"))
+    palette.setColor(QPalette.WindowText, QColor("#f0f0f0"))
+    palette.setColor(QPalette.Base, QColor("#202228"))
+    palette.setColor(QPalette.AlternateBase, QColor("#2a2d34"))
+    palette.setColor(QPalette.Text, QColor("#f0f0f0"))
+    palette.setColor(QPalette.Button, QColor("#2b2d31"))
+    palette.setColor(QPalette.ButtonText, QColor("#f0f0f0"))
+    palette.setColor(QPalette.Highlight, QColor("#2f8cff"))
+    palette.setColor(QPalette.HighlightedText, QColor("#ffffff"))
+    app.setPalette(palette)
 
     window = AppWindow(app)
     window.show()
