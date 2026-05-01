@@ -135,21 +135,21 @@ Playing: guitar (solo)
 Controls: SPACE=play/pause  W/S=speed  E/D=pitch  Z/X/C/V=seek  H=hold
           [/]=loop start/end  L=loop  1/2/3=solo/backing/mix  0=restart  Q=quit
 
-  ⏸ 0:13.31 / 3:19.22  |  speed: 50%  |  pitch: 0c  |  loop: OFF 0:11.70-0:14.41  |  mode: solo  |  part: guitar                               
-                                                                                                                                               
-                                                                                                                                ▆              
-                                                                                                                                █              
-                                                                                                 ▇        ▇       ▃        ▅    █▁             
-                                                     ▁            ▁                              █        █       █▁       █   ▅██▄▁     ▃  ▁  
-     ▁   ▁ ▁ ▁▂▂ ▁▁   ▁▁▁ ▅▁▁      ▁   ▆▃▁           █▁           █▂       ▂▂                    █       ▇█       ██       █▄  █████▁   ▂█▅▁█  
-  ▄▃▆█▇▇▆█▇█▅███▇██▆▅▃███▇███▅▃▅▅▃▁█▅▅▄███▇▅▅▂▃▂▄▆▃▃▇██▅▃▃▃▃▁▂▅▂▁▁██▇▄▄▃▁▁▁██▇▆▆       ▁ ▁      ▄█▇      ██▆▁     ██▃      ██▆▂██████▅▅▃█████  
-  ██████████████████████████████████████████████████████████████████████████████▆▆▇▇▇▇▇█▇█▇▆▅▄▂▂███▇▅▃▃▂▁████▅▄▃▃▂███▇▆▄▃▂▂██████████████████  
-                                      [                                ↑                     ]                                                 
+  ⏸ 0:13.31 / 3:19.22  |  speed: 50%  |  pitch: 0c  |  loop: OFF 0:11.70-0:14.41  |  mode: solo  |  part: guitar
+
+                                                                                                                                ▆
+                                                                                                                                █
+                                                                                                 ▇        ▇       ▃        ▅    █▁
+                                                     ▁            ▁                              █        █       █▁       █   ▅██▄▁     ▃  ▁
+     ▁   ▁ ▁ ▁▂▂ ▁▁   ▁▁▁ ▅▁▁      ▁   ▆▃▁           █▁           █▂       ▂▂                    █       ▇█       ██       █▄  █████▁   ▂█▅▁█
+  ▄▃▆█▇▇▆█▇█▅███▇██▆▅▃███▇███▅▃▅▅▃▁█▅▅▄███▇▅▅▂▃▂▄▆▃▃▇██▅▃▃▃▃▁▂▅▂▁▁██▇▄▄▃▁▁▁██▇▆▆       ▁ ▁      ▄█▇      ██▆▁     ██▃      ██▆▂██████▅▅▃█████
+  ██████████████████████████████████████████████████████████████████████████████▆▆▇▇▇▇▇█▇█▇▆▅▄▂▂███▇▅▃▃▂▁████▅▄▃▃▂███▇▆▄▃▂▂██████████████████
+                                      [                                ↑                     ]
 ```
 
-**Modes** (cycled with `M`):
-- **solo** — hear only the selected part
-- **mute** — hear everything *except* the selected part (play-along)
+**Modes** -- chosen using number keys 1 (solo), 2 (backing), and 3(mix):
+- **solo** — hear only the selected part (practice)
+- **backing** — hear everything *except* the selected part (play-along)
 - **mix** — hear the full original mix
 
 Pitch is displayed in semitones and cents when the shift is large enough (e.g. `+3st+20c`), useful for transposing parts into a comfortable range.
