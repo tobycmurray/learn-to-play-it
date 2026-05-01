@@ -94,7 +94,7 @@ class SeparationWorker(QThread):
 
 PRESETS = {
     "practice": {"mode": "solo", "speed": 50, "label": "Practice — solo at 50% speed"},
-    "play_along": {"mode": "mute", "speed": 100, "label": "Play Along — backing track at full speed"},
+    "play_along": {"mode": "backing", "speed": 100, "label": "Play Along — backing track at full speed"},
 }
 
 
@@ -264,7 +264,9 @@ class AppWindow(QMainWindow):
             Qt.Key_X: lambda: self._cmd(lambda p: p.seek(-NUDGE_SECONDS)),
             Qt.Key_C: lambda: self._cmd(lambda p: p.seek(NUDGE_SECONDS)),
             Qt.Key_V: lambda: self._cmd(lambda p: p.seek(SEEK_SECONDS)),
-            Qt.Key_M: lambda: self._cmd(lambda p: p.change_mode()),
+            Qt.Key_1: lambda: self._cmd(lambda p: p.set_mode("solo")),
+            Qt.Key_2: lambda: self._cmd(lambda p: p.set_mode("backing")),
+            Qt.Key_3: lambda: self._cmd(lambda p: p.set_mode("mix")),
             Qt.Key_H: lambda: self._cmd(lambda p: p.toggle_hold()),
             Qt.Key_L: lambda: self._cmd(lambda p: p.toggle_loop()),
             Qt.Key_BracketLeft: lambda: self._cmd(lambda p: p.set_loop_start()),

@@ -20,7 +20,7 @@ HOLD_DURATION = 0.4
 
 BLOCK_SIZE = 1024
 RING_CAPACITY = 16384
-MODES = ["solo", "mute", "mix"]
+MODES = ["solo", "backing", "mix"]
 
 
 @dataclass
@@ -95,7 +95,7 @@ class Player:
 
         self.mixes = {
             "solo": mix_stems(self.stems, "solo", part),
-            "mute": mix_stems(self.stems, "mute", part),
+            "backing": mix_stems(self.stems, "mute", part),
             "mix": mix_stems(self.stems, "mix", part),
         }
         self.channels = self.mixes["solo"].shape[1] if self.mixes["solo"].ndim > 1 else 1
@@ -327,9 +327,9 @@ class Player:
         self.cents = new_cents
         self._rebuild_hold_slice()
 
-    def change_mode(self):
-        idx = (MODES.index(self.mode) + 1) % len(MODES)
-        self.mode = MODES[idx]
+    def set_mode(self, mode):
+        if mode in MODES:
+            self.mode = mode
 
     def seek(self, seconds):
         if self.hold is not None:

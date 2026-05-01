@@ -157,5 +157,5 @@ def play_along(audio_file, part, speed, pitch, device, gui):
     from .player import Player
 
     stems_dir = ensure_stems(audio_file)
-    player = Player(stems_dir, part, initial_mode="mute", initial_speed=speed / 100, initial_cents=pitch, device=_parse_device(device))
+    player = Player(stems_dir, part, initial_mode="backing", initial_speed=speed / 100, initial_cents=pitch, device=_parse_device(device))
     _run_display(player, gui)

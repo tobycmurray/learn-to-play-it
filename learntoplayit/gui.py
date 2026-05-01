@@ -262,7 +262,6 @@ class PlayerWidget(QWidget):
     def set_player(self, player):
         self.player = player
         self.waveform.player = player
-        self.part_label.setText(f"part: {player.part}")
 
     def _build_status(self, layout):
         self.status_label = QLabel("⏸  0:00.00 / 0:00.00")
@@ -348,11 +347,11 @@ class PlayerWidget(QWidget):
 
         row = QHBoxLayout()
 
-        start_btn = ActionButton("Set Loop Start", "[", minWidth=LOOP_W)
+        start_btn = ActionButton("Set Loop Start", "[", minWidth=LOOP_W, icon_name="loop-start")
         start_btn.clicked.connect(lambda: self._cmd(lambda p: p.set_loop_start()))
         row.addWidget(start_btn)
 
-        end_btn = ActionButton("Set Loop End", "]", minWidth=LOOP_W)
+        end_btn = ActionButton("Set Loop End", "]", minWidth=LOOP_W, icon_name="loop-end")
         end_btn.clicked.connect(lambda: self._cmd(lambda p: p.set_loop_end()))
         row.addWidget(end_btn)
 
@@ -375,18 +374,22 @@ class PlayerWidget(QWidget):
     def _build_mode(self, layout):
         row = QHBoxLayout()
 
-        self.mode_btn = ActionButton("Change Mode", "M", minWidth=LOOP_W)
-        self.mode_btn.clicked.connect(lambda: self._cmd(lambda p: p.change_mode()))
-        row.addWidget(self.mode_btn)
+        self._mode_buttons = {}
+        for mode, key, icon in [
+            ("solo", "1", "solo"),
+            ("backing", "2", "backing"),
+            ("mix", "3", "mix"),
+        ]:
+            btn = ActionButton(mode.capitalize(), key, minWidth=LOOP_W, icon_name=icon)
+            btn.clicked.connect(lambda _, m=mode: self._cmd(lambda p: p.set_mode(m)))
+            row.addWidget(btn)
+            self._mode_buttons[mode] = btn
+
         row.addSpacing(16)
 
-        self.mode_label = QLabel("")
-        row.addWidget(self.mode_label)
-        row.addSpacing(12)
-
-        self.part_label = QLabel("")
-        self.part_label.setStyleSheet("color: gray;")
-        row.addWidget(self.part_label)
+        self.mode_status = QLabel("")
+        self.mode_status.setMinimumWidth(90)
+        row.addWidget(self.mode_status)
 
         row.addStretch()
         layout.addLayout(row)
@@ -409,7 +412,9 @@ class PlayerWidget(QWidget):
 
         self.play_btn.set_action("Pause" if p.playing else "Play", icon_name="pause" if p.playing else "play")
         self.hold_btn.set_action("Release" if p.hold is not None else "Hold")
-        self.mode_label.setText(f"<b>Playback Mode:</b> {p.mode}")
+        for mode, btn in self._mode_buttons.items():
+            btn.setEnabled(mode != p.mode)
+        self.mode_status.setText(f"<b>Play mode:</b> {p.mode}")
 
         loop = p.loop
         can_toggle = loop is not None and loop.is_complete()
@@ -463,7 +468,9 @@ class GuiDisplay(QMainWindow):
             Qt.Key_X: lambda: self.player.seek(-NUDGE_SECONDS),
             Qt.Key_C: lambda: self.player.seek(NUDGE_SECONDS),
             Qt.Key_V: lambda: self.player.seek(SEEK_SECONDS),
-            Qt.Key_M: lambda: self.player.change_mode(),
+            Qt.Key_1: lambda: self.player.set_mode("solo"),
+            Qt.Key_2: lambda: self.player.set_mode("backing"),
+            Qt.Key_3: lambda: self.player.set_mode("mix"),
             Qt.Key_H: lambda: self.player.toggle_hold(),
             Qt.Key_L: lambda: self.player.toggle_loop(),
             Qt.Key_BracketLeft: lambda: self.player.set_loop_start(),

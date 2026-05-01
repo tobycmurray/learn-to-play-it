@@ -35,7 +35,7 @@ class TerminalDisplay:
         p = self.player
         print(f"Playing: {p.part} ({p.mode})")
         print("Controls: SPACE=play/pause  W/S=speed  E/D=pitch  Z/X/C/V=seek  H=hold")
-        print("          [/]=loop start/end  L=loop  M=mode  0=restart  Q=quit")
+        print("          [/]=loop start/end  L=loop  1/2/3=solo/backing/mix  0=restart  Q=quit")
         print()
 
         p.start()
@@ -157,8 +157,12 @@ class TerminalDisplay:
             p.seek(NUDGE_SECONDS)
         elif key.lower() == "v":
             p.seek(SEEK_SECONDS)
-        elif key.lower() == "m":
-            p.change_mode()
+        elif key == "1":
+            p.set_mode("solo")
+        elif key == "2":
+            p.set_mode("backing")
+        elif key == "3":
+            p.set_mode("mix")
         elif key.lower() == "h":
             p.toggle_hold()
         elif key == "[":
