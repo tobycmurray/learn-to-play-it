@@ -4,7 +4,9 @@ from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QHBoxLayout,
     QLabel, QPushButton, QFrame, QSlider,
+    QSizePolicy,
 )
+
 
 from .player import (
     SPEED_STEP, PITCH_STEP, SEEK_SECONDS, NUDGE_SECONDS,
@@ -25,7 +27,7 @@ MONO_FONT = "'Menlo', 'Courier New', monospace"
 
 class ActionButton(QPushButton):
 
-    def __init__(self, action, key, parent=None):
+    def __init__(self, action, key, parent=None, minWidth=200):
         super().__init__(parent)
         self.setFixedHeight(40)
         btn_layout = QHBoxLayout(self)
@@ -36,6 +38,8 @@ class ActionButton(QPushButton):
         self._key_label = QLabel(key)
         self._key_label.setStyleSheet("color: gray;")
         btn_layout.addWidget(self._key_label)
+        self.setMinimumWidth(minWidth)
+        self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
 
     def set_action(self, text):
         self._action_label.setText(text)
@@ -119,15 +123,16 @@ class SliderControl(QWidget):
         layout.setAlignment(Qt.AlignHCenter)
 
         lbl = QLabel(label)
+        lbl.setStyleSheet("font-weight: bold;")
         lbl.setAlignment(Qt.AlignCenter)
         layout.addWidget(lbl)
 
         self._value_label = QLabel("")
         self._value_label.setAlignment(Qt.AlignCenter)
-        self._value_label.setStyleSheet("font-weight: bold;")
         layout.addWidget(self._value_label)
 
-        up_label = QLabel(f"[{key_up}]")
+        up_label = QLabel(f"{key_up}")
+        up_label.setStyleSheet("color: gray;")
         up_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(up_label)
 
@@ -138,7 +143,8 @@ class SliderControl(QWidget):
         self._slider.setMinimumHeight(80)
         layout.addWidget(self._slider, alignment=Qt.AlignHCenter)
 
-        down_label = QLabel(f"[{key_down}]")
+        down_label = QLabel(f"{key_down}")
+        down_label.setStyleSheet("color: gray;")
         down_label.setAlignment(Qt.AlignCenter)
         layout.addWidget(down_label)
 
@@ -191,15 +197,15 @@ class PlayerWidget(QWidget):
     def _build_transport(self, layout):
         row = QHBoxLayout()
 
-        self.play_btn = ActionButton("▶ Play", "Space")
+        self.play_btn = ActionButton("▶ Play", "Space", minWidth=150)
         self.play_btn.clicked.connect(lambda: self._cmd(lambda p: p.toggle_play()))
         row.addWidget(self.play_btn)
 
-        restart_btn = ActionButton("⏮ Restart", "0")
+        restart_btn = ActionButton("⏮ Restart", "0", minWidth=150)
         restart_btn.clicked.connect(lambda: self._cmd(lambda p: p.restart()))
         row.addWidget(restart_btn)
 
-        self.hold_btn = ActionButton("⏺ Hold", "H")
+        self.hold_btn = ActionButton("⏺ Hold", "H", minWidth=150)
         self.hold_btn.clicked.connect(lambda: self._cmd(lambda p: p.toggle_hold()))
         row.addWidget(self.hold_btn)
 
@@ -216,7 +222,7 @@ class PlayerWidget(QWidget):
             (f"› +{nudge}", "C", NUDGE_SECONDS),
             (f"» +{seek}", "V", SEEK_SECONDS),
         ]:
-            btn = ActionButton(action, key)
+            btn = ActionButton(action, key, minWidth=100)
             btn.clicked.connect(lambda _, s=seconds: self._cmd(lambda p: p.seek(s)))
             row.addWidget(btn)
 
@@ -256,12 +262,14 @@ class PlayerWidget(QWidget):
 
         row = QHBoxLayout()
 
-        start_btn = ActionButton("Set Start", "[")
+        start_btn = ActionButton("Set Loop Start", "[")
         start_btn.clicked.connect(lambda: self._cmd(lambda p: p.set_loop_start()))
+        start_btn.setMinimumWidth(160)
         row.addWidget(start_btn)
 
-        end_btn = ActionButton("Set End", "]")
+        end_btn = ActionButton("Set Loop End", "]")
         end_btn.clicked.connect(lambda: self._cmd(lambda p: p.set_loop_end()))
+        end_btn.setMinimumWidth(160)
         row.addWidget(end_btn)
 
         self.loop_btn = ActionButton("Enable Loop", "L")
@@ -274,7 +282,8 @@ class PlayerWidget(QWidget):
 
         self.loop_label = QLabel("")
         self.loop_label.setStyleSheet(f"font-family: {MONO_FONT};")
-        row.addWidget(self.loop_label)
+        self.loop_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
+        row.addWidget(self.loop_label, 1)
 
         row.addStretch()
         layout.addLayout(row)
@@ -284,6 +293,7 @@ class PlayerWidget(QWidget):
 
         self.mode_btn = ActionButton("Change Mode", "M")
         self.mode_btn.setMinimumWidth(160)
+        self.mode_btn.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
         self.mode_btn.clicked.connect(lambda: self._cmd(lambda p: p.change_mode()))
         row.addWidget(self.mode_btn)
 
@@ -346,8 +356,8 @@ class GuiDisplay(QMainWindow):
         self.player = player
 
         self.setWindowTitle(f"ltpi — {player.part}")
-        self.setMinimumWidth(720)
-        self.resize(720, 580)
+        self.setMinimumWidth(800)
+        self.resize(800, 600)
 
         self.player_widget = PlayerWidget()
         self.setCentralWidget(self.player_widget)

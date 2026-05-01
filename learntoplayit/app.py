@@ -1,3 +1,4 @@
+import os
 import re
 import shutil
 import sys
@@ -21,6 +22,26 @@ from .player import (
 )
 from .separate import STEM_NAMES
 
+
+APP_NAME = "Learn To Play It"
+
+def add_bundled_bin_to_path():
+    if getattr(sys, "frozen", False):
+        exe_dir = Path(sys.executable).resolve().parent
+        bundled_bin = exe_dir.parent / "Resources" / "bin"
+
+        if bundled_bin.exists():
+            os.environ["PATH"] = str(bundled_bin) + os.pathsep + os.environ.get("PATH", "")
+
+def default_stems_root():
+    if sys.platform == "darwin" and getattr(sys, "frozen", False):
+        base = Path.home() / "Library" / "Application Support" / APP_NAME
+    else:
+        base = Path.cwd()
+
+    stems = base / "stems"
+    stems.mkdir(parents=True, exist_ok=True)
+    return stems
 
 class PitchSpinBox(QSpinBox):
     def textFromValue(self, value):
@@ -158,8 +179,8 @@ class SetupDialog(QDialog):
 
 class AppWindow(QMainWindow):
 
-    def __init__(self):
-        self.app = QApplication.instance() or QApplication(sys.argv)
+    def __init__(self, app):
+        self.app = app
         super().__init__()
 
         self.player = None
@@ -170,6 +191,9 @@ class AppWindow(QMainWindow):
         self.setWindowTitle("Learn To Play It")
         self.setMinimumWidth(720)
         self.resize(720, 580)
+
+        from .separate import set_stems_root
+        set_stems_root(default_stems_root())
 
         self._build_menu()
 
@@ -320,11 +344,16 @@ class AppWindow(QMainWindow):
             self.player.stop()
         event.accept()
 
-    def run(self):
-        self.show()
-        self.app.exec()
-
 
 def main():
-    window = AppWindow()
-    window.run()
+    import multiprocessing
+    multiprocessing.freeze_support()
+
+    add_bundled_bin_to_path()
+
+    app = QApplication(sys.argv)
+    app.setStyle("fusion")
+
+    window = AppWindow(app)
+    window.show()
+    sys.exit(app.exec())
