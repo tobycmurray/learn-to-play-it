@@ -162,6 +162,8 @@ class SetupDialog(QDialog):
         self._device_combo.setMinimumWidth(250)
         self._device_combo.addItem("System Default", None)
         import sounddevice as sd
+        sd._terminate()
+        sd._initialize()
         for i, d in enumerate(sd.query_devices()):
             if d["max_output_channels"] > 0:
                 self._device_combo.addItem(d["name"], i)
@@ -349,9 +351,16 @@ class AppWindow(QMainWindow):
             self.player.stop()
 
         from .player import Player
-        self.player = Player(stems_dir, part, initial_mode=mode, initial_speed=speed, initial_cents=pitch, device=device)
+        player = Player(stems_dir, part, initial_mode=mode, initial_speed=speed, initial_cents=pitch, device=device)
+        try:
+            player.start()
+        except Exception as e:
+            player.stop()
+            QMessageBox.critical(self, "Playback Error", f"Could not start playback:\n{e}")
+            return
+
+        self.player = player
         self.player_widget.set_player(self.player)
-        self.player.start()
         self.player_widget._timer.start(50)
 
         self.welcome.hide()
