@@ -1,8 +1,12 @@
+<p align="center">
+  <img src="packaging/macos/learntoplayit/resources/app_icon.png" alt="Learn To Play It" width="128">
+</p>
+
 # Learn To Play It (ltpi)
 
 [![CI](https://github.com/tobycmurray/learn-to-play-it/actions/workflows/ci.yml/badge.svg)](https://github.com/tobycmurray/learn-to-play-it/actions/workflows/ci.yml)
 
-A CLI tool that helps musicians learn parts from recorded songs by:
+A tool that helps musicians learn parts from recorded songs by:
 
 1. **Separating** a recording into individual instrument stems (vocals, drums, bass, other) using AI source separation
 2. **Practicing** an isolated part slowed down, with optional pitch shifting and section looping, progressively speeding up as you learn it
@@ -24,6 +28,32 @@ pip install -e .
 ```
 
 This installs the `ltpi` command into your virtualenv. Activate the venv (`source .venv/bin/activate`) before each session.
+
+### GUI
+
+To install with the graphical interface:
+
+```bash
+pip install -e ".[gui]"
+```
+
+Then launch with:
+
+```bash
+ltpi-gui
+```
+
+Open an audio file via File > Open. The app will separate stems automatically (with a progress bar), then present a setup dialog to choose your part and mode. The player window provides the same controls as the CLI with clickable buttons, draggable speed/pitch sliders, and a live waveform display.
+
+<p align="center">
+  <img src="docs/screenshot.png" alt="GUI player" width="600">
+</p>
+
+The GUI is also available as an alternative frontend for the CLI:
+
+```bash
+ltpi practice song.mp3 bass --gui
+```
 
 ## Usage
 
@@ -184,7 +214,7 @@ ltpi practice song.mp3 guitar
 
 **Legal note**: Downloading audio from YouTube may violate YouTube's Terms of Service and could raise copyright concerns depending on your jurisdiction. Users are responsible for ensuring their use complies with applicable laws and terms. This tool is intended for personal practice and educational use.
 
-## Possible Future directions
+## Possible future directions
 
 - MIDI / guitar tab transcription from isolated parts
-- GUI frontend
+- Standalone macOS app bundle
