@@ -13,8 +13,9 @@ fi
 python3 -m venv "$BUILD_VENV"
 source "$BUILD_VENV/bin/activate"
 python -m pip install --upgrade pip "setuptools<82" wheel
-python -m pip install -e '.[gui]'
-python -m pip install pyinstaller # pillow
+python -m pip install -r requirements-gui.lock
+python -m pip install -e '.[gui]' --no-deps
+python -m pip install pyinstaller
 
 # Create AppIcon.icns from the checked-in PNG, if needed.
 ./packaging/macos/make_icns.sh
