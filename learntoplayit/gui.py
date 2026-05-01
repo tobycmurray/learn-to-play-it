@@ -1,5 +1,8 @@
-from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QKeySequence, QShortcut, QPainter, QColor, QPen
+from pathlib import Path
+
+from PySide6.QtCore import Qt, QTimer, QSize
+from PySide6.QtGui import QKeySequence, QShortcut, QPainter, QColor, QPen, QIcon, QPixmap
+from PySide6.QtSvg import QSvgRenderer
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QHBoxLayout,
@@ -24,59 +27,95 @@ WAVEFORM_BG = QColor(30, 30, 35)
 WAVEFORM_PAD = 4
 MONO_FONT = "'Menlo', 'Courier New', monospace"
 
+WINDOW_MIN_W = 900
+WINDOW_W = 900
+WINDOW_H = 600
+
 TRANSPORT_W = 200
 BUTTON_H = 44
-
-#BUTTON_H = 38
-#TRANSPORT_W = 160
-
 SEEK_W = 140
 LOOP_W = 170
 SLIDER_W = 64
 
+ICON_SIZE = 18
+
+_icon_cache: dict[str, QPixmap] = {}
+_ICONS_DIR = Path(__file__).parent / "resources" / "icons"
+
+
+def _load_icon_pixmap(name: str, color: str) -> QPixmap:
+    key = f"{name}:{color}"
+    if key in _icon_cache:
+        return _icon_cache[key]
+    svg_bytes = (_ICONS_DIR / f"{name}.svg").read_bytes()
+    svg_str = svg_bytes.decode().replace('stroke="currentColor"', f'stroke="{color}"')
+    renderer = QSvgRenderer(svg_str.encode())
+    pixmap = QPixmap(QSize(ICON_SIZE, ICON_SIZE))
+    pixmap.fill(Qt.transparent)
+    painter = QPainter(pixmap)
+    renderer.render(painter)
+    painter.end()
+    _icon_cache[key] = pixmap
+    return pixmap
+
+
+BUTTON_STYLE = """
+ActionButton {
+    border: 1px solid palette(mid);
+    border-radius: 8px;
+    font-size: 15px;
+}
+ActionButton:hover {
+    background: palette(midlight);
+}
+ActionButton:pressed {
+    background: palette(dark);
+}
+"""
 
 
 class ActionButton(QPushButton):
 
-    def __init__(self, action, key, parent=None, minWidth=200):
+    def __init__(self, action, key, parent=None, minWidth=200, icon_name=None):
         super().__init__(parent)
+        self._icon_name = icon_name
         self.setFixedSize(minWidth, BUTTON_H)
         btn_layout = QHBoxLayout(self)
         btn_layout.setContentsMargins(12, 0, 12, 0)
+
+        self._icon_label = QLabel()
+        self._icon_label.setFixedSize(ICON_SIZE, ICON_SIZE)
+        if not icon_name:
+            self._icon_label.hide()
+        btn_layout.addWidget(self._icon_label)
+
         self._action_label = QLabel(action)
         self._action_label.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Preferred)
         btn_layout.addWidget(self._action_label)
         btn_layout.addStretch()
         self._key_label = QLabel(key)
         self._key_label.setStyleSheet("color: #8b8f98; font-size: 13px;")
-        #self._key_label.setStyleSheet("color: gray;")
         self._key_label.setFixedWidth(44)
         self._key_label.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
         btn_layout.addWidget(self._key_label)
         self.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
-        self.setStyleSheet("""
-        ActionButton {
-        //background: #2b2d31;
-        //color: #f2f2f2;
-        border: 1px solid #3f4248;
-        border-radius: 8px;
-        font-size: 15px;
-        }
-        ActionButton:hover {
-        background: #343740;
-    }
-        ActionButton:pressed {
-        background: #1f2126;
-        }
-        ActionButton:disabled {
-        background: #24262a;
-        color: #777;
-        border-color: #333;
-        }
-        """)
+        self.setStyleSheet(BUTTON_STYLE)
 
-    def set_action(self, text):
+    def showEvent(self, event):
+        super().showEvent(event)
+        if self._icon_name:
+            self._update_icon()
+
+    def _update_icon(self):
+        color = self.palette().buttonText().color().name()
+        self._icon_label.setPixmap(_load_icon_pixmap(self._icon_name, color))
+        self._icon_label.show()
+
+    def set_action(self, text, icon_name=None):
         self._action_label.setText(text)
+        if icon_name is not None and icon_name != self._icon_name:
+            self._icon_name = icon_name
+            self._update_icon()
 
 
 class WaveformWidget(QWidget):
@@ -235,17 +274,17 @@ class PlayerWidget(QWidget):
 
         row.addStretch()
 
-        self.play_btn = ActionButton("▶ Play", "Space", minWidth=TRANSPORT_W)
+        self.play_btn = ActionButton("Play", "Space", minWidth=TRANSPORT_W, icon_name="play")
         self.play_btn.clicked.connect(lambda: self._cmd(lambda p: p.toggle_play()))
         row.addWidget(self.play_btn)
         row.addSpacing(28)
 
-        restart_btn = ActionButton("⏮ Restart", "0", minWidth=TRANSPORT_W)
+        restart_btn = ActionButton("Restart", "0", minWidth=TRANSPORT_W, icon_name="skip-back")
         restart_btn.clicked.connect(lambda: self._cmd(lambda p: p.restart()))
         row.addWidget(restart_btn)
         row.addSpacing(28)
 
-        self.hold_btn = ActionButton("⏺ Hold", "H", minWidth=TRANSPORT_W)
+        self.hold_btn = ActionButton("Hold", "H", minWidth=TRANSPORT_W, icon_name="rotate-ccw")
         self.hold_btn.clicked.connect(lambda: self._cmd(lambda p: p.toggle_hold()))
         row.addWidget(self.hold_btn)
 
@@ -258,15 +297,15 @@ class PlayerWidget(QWidget):
 
         seek = f"{SEEK_SECONDS:g}s"
         nudge = f"{NUDGE_SECONDS:g}s"
-        for idx, (action, key, seconds) in enumerate([
-            (f"⏪  {seek}", "Z", -SEEK_SECONDS),
-            (f"⏴  {nudge}", "X", -NUDGE_SECONDS),
-            (f"⏵  {nudge}", "C", NUDGE_SECONDS),
-            (f"⏩ {seek}", "V", SEEK_SECONDS),
+        for idx, (action, key, seconds, icon) in enumerate([
+            (seek, "Z", -SEEK_SECONDS, "rewind"),
+            (nudge, "X", -NUDGE_SECONDS, "step-back"),
+            (nudge, "C", NUDGE_SECONDS, "step-forward"),
+            (seek, "V", SEEK_SECONDS, "fast-forward"),
         ]):
             if idx:
                 row.addSpacing(20)
-            btn = ActionButton(action, key, minWidth=SEEK_W)
+            btn = ActionButton(action, key, minWidth=SEEK_W, icon_name=icon)
             btn.clicked.connect(lambda _, s=seconds: self._cmd(lambda p: p.seek(s)))
             row.addWidget(btn)
 
@@ -317,7 +356,7 @@ class PlayerWidget(QWidget):
         end_btn.clicked.connect(lambda: self._cmd(lambda p: p.set_loop_end()))
         row.addWidget(end_btn)
 
-        self.loop_btn = ActionButton("Enable Loop", "L", minWidth=LOOP_W)
+        self.loop_btn = ActionButton("Enable Loop", "L", minWidth=LOOP_W, icon_name="repeat")
         self.loop_btn.clicked.connect(lambda: self._cmd(lambda p: p.toggle_loop()))
         row.addWidget(self.loop_btn)
         row.addSpacing(16)
@@ -368,8 +407,8 @@ class PlayerWidget(QWidget):
         self.speed_slider.set_value(int(round(p.speed * 100)))
         self.pitch_slider.set_value(int(round(p.cents)))
 
-        self.play_btn.set_action("⏸ Pause" if p.playing else "▶ Play")
-        self.hold_btn.set_action("⏺ Release" if p.hold is not None else "⏺ Hold")
+        self.play_btn.set_action("Pause" if p.playing else "Play", icon_name="pause" if p.playing else "play")
+        self.hold_btn.set_action("Release" if p.hold is not None else "Hold")
         self.mode_label.setText(f"<b>Playback Mode:</b> {p.mode}")
 
         loop = p.loop
@@ -383,11 +422,12 @@ class PlayerWidget(QWidget):
             active = bounds[2]
             self.loop_status.setText(f"<b>Loop:</b> {'on' if active else 'off'}")
             self.loop_label.setText(f"{ls} – {le}")
-            self.loop_btn.set_action("Disable Loop" if active else "Enable Loop")
+            self.loop_btn.set_action("Disable Loop" if active else "Enable Loop",
+                                     icon_name="repeat-off" if active else "repeat")
         else:
             self.loop_status.setText("<b>Loop:</b> off")
             self.loop_label.setText("")
-            self.loop_btn.set_action("Enable Loop")
+            self.loop_btn.set_action("Enable Loop", icon_name="repeat")
 
         self.waveform.update()
 
@@ -401,8 +441,8 @@ class GuiDisplay(QMainWindow):
         self.player = player
 
         self.setWindowTitle(f"ltpi — {player.part}")
-        self.setMinimumWidth(900)
-        self.resize(900, 600)
+        self.setMinimumWidth(WINDOW_MIN_W)
+        self.resize(WINDOW_W, WINDOW_H)
 
         self.player_widget = PlayerWidget()
         self.setCentralWidget(self.player_widget)

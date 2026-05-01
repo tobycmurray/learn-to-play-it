@@ -30,6 +30,9 @@ test = [
 [tool.setuptools.packages.find]
 include = ["learntoplayit*"]
 
+[tool.setuptools.package-data]
+learntoplayit = ["resources/icons/*.svg", "resources/*.png"]
+
 [project.scripts]
 ltpi = "learntoplayit.cli:main"
 

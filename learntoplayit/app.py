@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QAction, QKeySequence, QShortcut, QPalette, QColor
+from PySide6.QtGui import QAction, QKeySequence, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QHBoxLayout,
@@ -15,7 +15,7 @@ from PySide6.QtWidgets import (
 )
 
 from .fmt import fmt_pitch
-from .gui import PlayerWidget
+from .gui import PlayerWidget, WINDOW_MIN_W, WINDOW_W, WINDOW_H
 from .player import (
     SPEED_STEP, PITCH_STEP, SEEK_SECONDS, NUDGE_SECONDS,
     SPEED_MIN, SPEED_MAX, PITCH_MIN, PITCH_MAX,
@@ -189,8 +189,8 @@ class AppWindow(QMainWindow):
         self._audio_file = None
 
         self.setWindowTitle("Learn To Play It")
-        self.setMinimumWidth(720)
-        self.resize(720, 580)
+        self.setMinimumWidth(WINDOW_MIN_W)
+        self.resize(WINDOW_W, WINDOW_H)
 
         from .separate import set_stems_root
         set_stems_root(default_stems_root())
@@ -352,20 +352,6 @@ def main():
     add_bundled_bin_to_path()
 
     app = QApplication(sys.argv)
-    app.setStyle("fusion")
-
-    # app colour palette
-    palette = QPalette()
-    palette.setColor(QPalette.Window, QColor("#181a1f"))
-    palette.setColor(QPalette.WindowText, QColor("#f0f0f0"))
-    palette.setColor(QPalette.Base, QColor("#202228"))
-    palette.setColor(QPalette.AlternateBase, QColor("#2a2d34"))
-    palette.setColor(QPalette.Text, QColor("#f0f0f0"))
-    palette.setColor(QPalette.Button, QColor("#2b2d31"))
-    palette.setColor(QPalette.ButtonText, QColor("#f0f0f0"))
-    palette.setColor(QPalette.Highlight, QColor("#2f8cff"))
-    palette.setColor(QPalette.HighlightedText, QColor("#ffffff"))
-    app.setPalette(palette)
 
     window = AppWindow(app)
     window.show()
