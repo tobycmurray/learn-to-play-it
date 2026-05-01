@@ -27,6 +27,12 @@ source .venv/bin/activate
 pip install -e .
 ```
 
+For reproducible installs with pinned dependencies:
+
+```bash
+pip install -r requirements.lock && pip install -e . --no-deps
+```
+
 This installs the `ltpi` command into your virtualenv. Activate the venv (`source .venv/bin/activate`) before each session.
 
 ### GUI
@@ -35,6 +41,12 @@ To install with the graphical interface:
 
 ```bash
 pip install -e ".[gui]"
+```
+
+Or with pinned dependencies:
+
+```bash
+pip install -r requirements-gui.lock && pip install -e ".[gui]" --no-deps
 ```
 
 Then launch with:
