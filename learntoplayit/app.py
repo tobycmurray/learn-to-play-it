@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout, QHBoxLayout,
     QLabel, QFileDialog,
     QDialog, QDialogButtonBox, QRadioButton, QButtonGroup,
-    QProgressDialog, QMessageBox, QSpinBox, QFrame,
+    QProgressDialog, QMessageBox, QSpinBox, QFrame, QComboBox,
 )
 
 from .fmt import fmt_pitch
@@ -151,6 +151,24 @@ class SetupDialog(QDialog):
         row.addStretch()
         layout.addLayout(row)
 
+        sep2 = QFrame()
+        sep2.setFrameShape(QFrame.HLine)
+        sep2.setFrameShadow(QFrame.Sunken)
+        layout.addWidget(sep2)
+
+        device_row = QHBoxLayout()
+        device_row.addWidget(QLabel("Output Device"))
+        self._device_combo = QComboBox()
+        self._device_combo.setMinimumWidth(250)
+        self._device_combo.addItem("System Default", None)
+        import sounddevice as sd
+        for i, d in enumerate(sd.query_devices()):
+            if d["max_output_channels"] > 0:
+                self._device_combo.addItem(d["name"], i)
+        device_row.addWidget(self._device_combo)
+        device_row.addStretch()
+        layout.addLayout(device_row)
+
         box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         box.accepted.connect(self.accept)
         box.rejected.connect(self.reject)
@@ -175,6 +193,9 @@ class SetupDialog(QDialog):
 
     def selected_pitch(self):
         return self._pitch_spin.value()
+
+    def selected_device(self):
+        return self._device_combo.currentData()
 
 
 class AppWindow(QMainWindow):
@@ -319,15 +340,16 @@ class AppWindow(QMainWindow):
             mode=dialog.selected_mode(),
             speed=dialog.selected_speed(),
             pitch=dialog.selected_pitch(),
+            device=dialog.selected_device(),
         )
 
-    def _load_player(self, stems_dir, audio_file, part, mode, speed, pitch):
+    def _load_player(self, stems_dir, audio_file, part, mode, speed, pitch, device=None):
         if self.player is not None:
             self.player_widget._timer.stop()
             self.player.stop()
 
         from .player import Player
-        self.player = Player(stems_dir, part, initial_mode=mode, initial_speed=speed, initial_cents=pitch)
+        self.player = Player(stems_dir, part, initial_mode=mode, initial_speed=speed, initial_cents=pitch, device=device)
         self.player_widget.set_player(self.player)
         self.player.start()
         self.player_widget._timer.start(50)
