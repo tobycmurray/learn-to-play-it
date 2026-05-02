@@ -100,6 +100,9 @@ class Player:
         }
         self.channels = self.mixes["solo"].shape[1] if self.mixes["solo"].ndim > 1 else 1
         self.song_len = len(self.mixes["solo"])
+
+        self._click_track = self._load_click_track(stems_dir)
+        self.click_active = self._click_track is not None
         self._mix_peaks = {mode: self._compute_rms_peak(mix) for mode, mix in self.mixes.items()}
 
         self.ring = RingBuffer(RING_CAPACITY, self.channels)
@@ -118,6 +121,17 @@ class Player:
         self._feeder_stop = threading.Event()
         self._feeder_paused = False
         self._feeder_thread = None
+
+    def _load_click_track(self, stems_dir):
+        from pathlib import Path
+        beats_path = Path(stems_dir) / "analysis" / "beats.json"
+        if not beats_path.exists():
+            return None
+        import json
+        with open(beats_path) as f:
+            beats_data = json.load(f)
+        from .beats import render_click_track
+        return render_click_track(beats_data, self.song_len, self.sr, self.channels)
 
     def _compute_rms_peak(self, mix):
         bin_samples = int(NUDGE_SECONDS * self.sr)
@@ -223,6 +237,8 @@ class Player:
 
             block_size = min(BLOCK_SIZE, end_pos - pos)
             block = mix[pos:pos + block_size]
+            if self.click_active:
+                block = block + self._click_track[pos:pos + block_size]
             self.stretcher.process(block.T, final=False)
             output = self.stretcher.retrieve_available()
             if output.shape[1] > 0:
@@ -330,6 +346,10 @@ class Player:
     def set_mode(self, mode):
         if mode in MODES:
             self.mode = mode
+
+    def toggle_click(self):
+        if self._click_track is not None:
+            self.click_active = not self.click_active
 
     def seek(self, seconds):
         if self.hold is not None:
