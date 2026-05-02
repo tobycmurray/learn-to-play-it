@@ -43,7 +43,7 @@ def test_import_separate():
 
 @needs_portaudio
 def test_import_player():
-    from learntoplayit.player import Player, play_interactive, WaveformData
+    from learntoplayit.player import Player, WaveformData
 
 
 @needs_portaudio
