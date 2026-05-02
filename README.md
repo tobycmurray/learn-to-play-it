@@ -9,8 +9,9 @@
 A tool that helps musicians learn parts from recorded songs by:
 
 1. **Separating** a recording into individual instrument stems (vocals, drums, bass, other) using AI source separation
-2. **Practicing** an isolated part slowed down, with optional pitch shifting and section looping, progressively speeding up as you learn it
-3. **Playing along** with the full mix minus your instrument — like karaoke, but for any part
+2. Using **beat detection** to provide an intelligent metronome and count-in during playback, to support
+3. **Practicing** an isolated part slowed down, with optional pitch shifting and section looping, progressively speeding up as you learn it, finally enabling
+4. **Playing along** with the full mix minus your instrument — like karaoke, but for any part
 
 ## Prerequisites
 
@@ -136,16 +137,16 @@ A waveform is rendered when playback is paused, allowing precise control of loop
 Controls: SPACE=play/pause  W/S=speed  E/D=pitch  Z/X/C/V=seek  H=hold
           [/]=loop start/end  L=loop  B=click  N=count-in  1/2/3=solo/backing/mix  0=restart  Q=quit
 
-  ⏸ 0:03.88 / 3:19.22  |  speed: 70%  |  pitch: 0c  |  loop: ON 0:00.47-0:07.54  |  click: ON  |  count-in: ON  |  mode: mix  |  part: guitar   
-                                                                                                                                ▂               
-                                                                                                                                █               
-                                                                                                                                █       ▆▂      
-                                                                                                                                █▂      ██▂     
-                                                                                                                                ██▂     ███▂▁▁  
-                                                                                                                                ███▆▆▁▁▂██████  
-    ▃▄▂▁ ▁▁▁▁▁   ▁▂▁▁     ▁▁▁  ▁          ▁ ▂▃▃▁▁▁  ▂▄▂▂▂▃▂▁▁▁▁▁▁▁▁▁   ▁  ▁▂▁▁▁▁    ▁   ▅▅▃▂▁▁   ▁▁  ▁▃▁  ▁   ▁    ▄▃▁▁▁    ▁▁▁▇██████████████  
-  ▁▁████▇█████▇▇▆████▇▆▆▆▅███▇▆█▇▆▆▆▆▆▅▅▆▆█▇██████▇▇████████████████▇▆▇█▇▇██████▇▇▆▅█▇▆▅██████▇▆▇██▆▇███▇▆█▇▇▆█▇▆▅▅█████▇▇▇▇██████████████████  
-    [                                                                   ↑                                                                       
+  ⏸ 0:03.88 / 3:19.22  |  speed: 70%  |  pitch: 0c  |  loop: ON 0:00.47-0:07.54  |  click: ON  |  count-in: ON  |  mode: mix  |  part: guitar
+                                                                                                                                ▂
+                                                                                                                                █
+                                                                                                                                █       ▆▂
+                                                                                                                                █▂      ██▂
+                                                                                                                                ██▂     ███▂▁▁
+                                                                                                                                ███▆▆▁▁▂██████
+    ▃▄▂▁ ▁▁▁▁▁   ▁▂▁▁     ▁▁▁  ▁          ▁ ▂▃▃▁▁▁  ▂▄▂▂▂▃▂▁▁▁▁▁▁▁▁▁   ▁  ▁▂▁▁▁▁    ▁   ▅▅▃▂▁▁   ▁▁  ▁▃▁  ▁   ▁    ▄▃▁▁▁    ▁▁▁▇██████████████
+  ▁▁████▇█████▇▇▆████▇▆▆▆▅███▇▆█▇▆▆▆▆▆▅▅▆▆█▇██████▇▇████████████████▇▆▇█▇▇██████▇▇▆▅█▇▆▅██████▇▆▇██▆▇███▇▆█▇▇▆█▇▆▅▅█████▇▇▇▇██████████████████
+    [                                                                   ↑
 ```
 
 **Modes** -- chosen using number keys 1 (solo), 2 (backing), and 3(mix):
@@ -250,5 +251,5 @@ ltpi practice song.mp3 guitar
 ## Possible future directions
 
 - MIDI / guitar tab transcription from isolated stems
-- Adjustable count-in beat count (for non-4/4 time signatures)
+- Adjustable count-in beat count
 - Standalone macOS app bundle
