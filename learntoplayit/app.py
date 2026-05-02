@@ -302,6 +302,7 @@ class AppWindow(QMainWindow):
             Qt.Key_H: lambda: self._cmd(lambda p: p.toggle_hold()),
             Qt.Key_L: lambda: self._cmd(lambda p: p.toggle_loop()),
             Qt.Key_B: lambda: self._cmd(lambda p: p.toggle_click()),
+            Qt.Key_N: lambda: self._cmd(lambda p: p.toggle_count_in()),
             Qt.Key_BracketLeft: lambda: self._cmd(lambda p: p.set_loop_start()),
             Qt.Key_BracketRight: lambda: self._cmd(lambda p: p.set_loop_end()),
         }

@@ -35,7 +35,7 @@ class TerminalDisplay:
         p = self.player
         print(f"Playing: {p.part} ({p.mode})")
         print("Controls: SPACE=play/pause  W/S=speed  E/D=pitch  Z/X/C/V=seek  H=hold")
-        print("          [/]=loop start/end  L=loop  B=click  1/2/3=solo/backing/mix  0=restart  Q=quit")
+        print("          [/]=loop start/end  L=loop  B=click  N=count-in  1/2/3=solo/backing/mix  0=restart  Q=quit")
         print()
 
         p.start()
@@ -69,12 +69,13 @@ class TerminalDisplay:
             loop_str = "loop: OFF"
 
         click_str = "click: ON" if p.click_active else "click: OFF"
+        count_in_str = "count-in: ON" if p.count_in_enabled else "count-in: OFF"
 
         return (
             f"  {state} {fmt_time(p.playback_position)} / {fmt_time(p.song_duration)}  |  "
             f"speed: {speed_pct}%  |  pitch: {fmt_pitch(p.cents)}  |  "
             f"{loop_str}  |  "
-            f"{click_str}  |  "
+            f"{click_str}  |  {count_in_str}  |  "
             f"mode: {p.mode}  |  part: {p.part}"
         )
 
@@ -176,3 +177,5 @@ class TerminalDisplay:
             p.toggle_loop()
         elif key.lower() == "b":
             p.toggle_click()
+        elif key.lower() == "n":
+            p.toggle_count_in()

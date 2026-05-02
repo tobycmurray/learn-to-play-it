@@ -103,6 +103,8 @@ class Player:
 
         self._click_track = self._load_click_track(stems_dir)
         self.click_active = self._click_track is not None
+        self._count_in_track, self._count_in_samples = self._load_count_in(stems_dir)
+        self.count_in_enabled = self._count_in_track is not None
         self._mix_peaks = {mode: self._compute_rms_peak(mix) for mode, mix in self.mixes.items()}
 
         self.ring = RingBuffer(RING_CAPACITY, self.channels)
@@ -130,6 +132,18 @@ class Player:
         if beats_data is None:
             return None
         return render_click_track(beats_data, self.song_len, self.sr, self.channels)
+
+    def _load_count_in(self, stems_dir):
+        from pathlib import Path
+        from .beats import load_beats_from_dir, compute_count_in
+
+        beats_data = load_beats_from_dir(Path(stems_dir))
+        if beats_data is None:
+            return None, 0
+        result = compute_count_in(beats_data, self.sr, self.channels)
+        if result is None:
+            return None, 0
+        return result
 
     def _compute_rms_peak(self, mix):
         bin_samples = int(NUDGE_SECONDS * self.sr)
@@ -200,6 +214,34 @@ class Player:
         self.ring.flush()
         self.stretcher = self._make_stretcher()
 
+    def _read_block(self, pos, block_size):
+        """Read a block of audio at pos, handling negative (count-in) territory."""
+        mix = self.mixes[self.mode]
+
+        if pos >= 0:
+            block = mix[pos:pos + block_size].copy()
+            if self.click_active and self._click_track is not None:
+                block += self._click_track[pos:pos + block_size]
+        elif pos + block_size <= 0:
+            block = np.zeros((block_size, self.channels), dtype=np.float32)
+        else:
+            silent_part = -pos
+            audio_part = block_size - silent_part
+            block = np.zeros((block_size, self.channels), dtype=np.float32)
+            block[silent_part:] = mix[0:audio_part]
+            if self.click_active and self._click_track is not None:
+                block[silent_part:] += self._click_track[0:audio_part]
+
+        if self.count_in_enabled and self._count_in_track is not None:
+            ci_idx = pos + self._count_in_samples
+            ci_end = min(ci_idx + block_size, len(self._count_in_track))
+            if ci_idx < len(self._count_in_track) and ci_end > 0:
+                src_start = max(0, ci_idx)
+                dst_start = src_start - ci_idx
+                block[dst_start:dst_start + (ci_end - src_start)] += self._count_in_track[src_start:ci_end]
+
+        return block
+
     def _feeder_loop(self):
         while not self._feeder_stop.is_set():
             if self._feeder_paused:
@@ -217,7 +259,6 @@ class Player:
             self.stretcher.time_ratio = self._time_ratio
             self.stretcher.pitch_scale = self._pitch_scale
 
-            mix = self.mixes[self.mode]
             pos = self.pos_orig
             bounds = self.loop.active_bounds() if self.loop_active else None
             end_pos = bounds[1] if bounds else self.song_len
@@ -234,9 +275,7 @@ class Player:
                 continue
 
             block_size = min(BLOCK_SIZE, end_pos - pos)
-            block = mix[pos:pos + block_size]
-            if self.click_active:
-                block = block + self._click_track[pos:pos + block_size]
+            block = self._read_block(pos, block_size)
             self.stretcher.process(block.T, final=False)
             output = self.stretcher.retrieve_available()
             if output.shape[1] > 0:
@@ -349,6 +388,10 @@ class Player:
         if self._click_track is not None:
             self.click_active = not self.click_active
 
+    def toggle_count_in(self):
+        if self._count_in_track is not None:
+            self.count_in_enabled = not self.count_in_enabled
+
     def seek(self, seconds):
         if self.hold is not None:
             return
@@ -403,11 +446,17 @@ class Player:
             self.hold = HoldState(start_orig=start, end_orig=end, raw=raw, slice=processed)
             self._feeder_paused = True
 
+    @property
+    def _start_pos(self):
+        if self.count_in_enabled and self._count_in_samples > 0:
+            return -self._count_in_samples
+        return 0
+
     def restart(self):
         if self.hold is not None:
             return
         bounds = self.loop.active_bounds() if self.loop_active else None
-        self.pos_orig = bounds[0] if bounds else 0
+        self.pos_orig = bounds[0] if bounds else self._start_pos
         self._seek_requested = True
 
     def _process_hold_raw(self, raw: np.ndarray) -> np.ndarray:
@@ -427,6 +476,7 @@ class Player:
     # --- Lifecycle ---
 
     def start(self):
+        self.pos_orig = self._start_pos
         self._stream = sd.OutputStream(
             samplerate=self.sr,
             channels=self.channels,

@@ -33,6 +33,56 @@ def load_beats_from_dir(stems_dir: Path) -> dict | None:
         return json.load(f)
 
 
+COUNTIN_WARMUP = 0.1
+
+
+def compute_count_in(beats_data: dict, sr: int, channels: int) -> tuple[np.ndarray, int] | None:
+    """Compute a count-in click track leading into the first downbeat.
+
+    Uses BPM and time signature from the summary, plus the first downbeat position.
+    Returns (count_in_track, count_in_samples) or None if insufficient data.
+    Index mapping: array_idx = pos_orig + count_in_samples.
+    """
+    downbeats = beats_data.get("downbeats", [])
+    summary = beats_data.get("summary", {})
+    bpm = summary.get("bpm", 0)
+    time_sig = summary.get("time_signature", "4/4")
+
+    if not downbeats or bpm <= 0:
+        return None
+
+    n_beats = int(time_sig.split("/")[0])
+    beat_interval = 60.0 / bpm
+    first_downbeat = downbeats[0]
+
+    count_in_times = [first_downbeat - (n_beats - i) * beat_interval for i in range(n_beats)]
+
+    click_samples = int(CLICK_DURATION * sr)
+    t = np.arange(click_samples) / sr
+    envelope = np.exp(-t * 40)
+    downbeat_click = (np.sin(2 * np.pi * DOWNBEAT_FREQ * t) * envelope * CLICK_VOLUME).astype(np.float32)
+    beat_click = (np.sin(2 * np.pi * BEAT_FREQ * t) * envelope * CLICK_VOLUME).astype(np.float32)
+
+    warmup_samples = int(COUNTIN_WARMUP * sr)
+    count_in_samples = int(abs(count_in_times[0]) * sr) + warmup_samples
+    if count_in_samples <= 0:
+        return None
+
+    last_click_end = count_in_times[-1] + CLICK_DURATION
+    track_len = count_in_samples + int(last_click_end * sr)
+    track = np.zeros((track_len, channels), dtype=np.float32)
+
+    for i, ct in enumerate(count_in_times):
+        array_idx = int(ct * sr) + count_in_samples
+        if array_idx < 0 or array_idx + click_samples > track_len:
+            continue
+        click = downbeat_click if i == 0 else beat_click
+        for ch in range(channels):
+            track[array_idx:array_idx + click_samples, ch] += click
+
+    return track, count_in_samples
+
+
 def render_click_track(beats_data: dict, song_len: int, sr: int, channels: int) -> np.ndarray:
     """Render a click track as a numpy array matching song dimensions."""
     click_samples = int(CLICK_DURATION * sr)

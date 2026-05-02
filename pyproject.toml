@@ -16,6 +16,7 @@ dependencies = [
     "sounddevice",
     "numpy",
     "click",
+    "beat-this",
 ]
 
 [project.optional-dependencies]

@@ -48,7 +48,7 @@ def _load_icon_pixmap(name: str, color: str) -> QPixmap:
     if key in _icon_cache:
         return _icon_cache[key]
     svg_bytes = (_ICONS_DIR / f"{name}.svg").read_bytes()
-    svg_str = svg_bytes.decode().replace('stroke="currentColor"', f'stroke="{color}"')
+    svg_str = svg_bytes.decode().replace('stroke="currentColor"', f'stroke="{color}"').replace('fill="currentColor"', f'fill="{color}"')
     renderer = QSvgRenderer(svg_str.encode())
     pixmap = QPixmap(QSize(ICON_SIZE, ICON_SIZE))
     pixmap.fill(Qt.transparent)
@@ -392,6 +392,12 @@ class PlayerWidget(QWidget):
         row.addWidget(self.mode_status)
 
         row.addStretch()
+        layout.addLayout(row)
+
+        self._build_click(layout)
+
+    def _build_click(self, layout):
+        row = QHBoxLayout()
 
         self.click_btn = ActionButton("Enable Click", "B", minWidth=LOOP_W, icon_name="metronome")
         self.click_btn.clicked.connect(lambda: self._cmd(lambda p: p.toggle_click()))
@@ -400,8 +406,22 @@ class PlayerWidget(QWidget):
         row.addSpacing(16)
 
         self.click_status = QLabel("")
-        self.click_status.setMinimumWidth(90)
+        self.click_status.setMinimumWidth(160)
         row.addWidget(self.click_status)
+
+        row.addSpacing(16)
+
+        self.count_in_btn = ActionButton("Enable Count", "N", minWidth=LOOP_W, icon_name="drumsticks")
+        self.count_in_btn.clicked.connect(lambda: self._cmd(lambda p: p.toggle_count_in()))
+        row.addWidget(self.count_in_btn)
+
+        row.addSpacing(16)
+
+        self.count_in_status = QLabel("")
+        self.count_in_status.setMinimumWidth(200)
+        row.addWidget(self.count_in_status)
+
+        row.addStretch()
 
         layout.addLayout(row)
 
@@ -429,7 +449,10 @@ class PlayerWidget(QWidget):
 
         self.click_btn.set_action("Disable Click" if p.click_active else "Enable Click", icon_name="metronome")
         self.click_btn.setEnabled(p._click_track is not None)
+        self.count_in_btn.set_action("Disable Count" if p.count_in_enabled else "Enable Count", icon_name="drumsticks")
+        self.count_in_btn.setEnabled(p._count_in_track is not None)
         self.click_status.setText(f"<b>Click:</b> {'on' if p.click_active else 'off'}")
+        self.count_in_status.setText(f"<b>Count-in:</b> {'on' if p.count_in_enabled else 'off'}")
 
         loop = p.loop
         can_toggle = loop is not None and loop.is_complete()
@@ -489,6 +512,7 @@ class GuiDisplay(QMainWindow):
             Qt.Key_H: lambda: self.player.toggle_hold(),
             Qt.Key_L: lambda: self.player.toggle_loop(),
             Qt.Key_B: lambda: self.player.toggle_click(),
+            Qt.Key_N: lambda: self.player.toggle_count_in(),
             Qt.Key_BracketLeft: lambda: self.player.set_loop_start(),
             Qt.Key_BracketRight: lambda: self.player.set_loop_end(),
         }
