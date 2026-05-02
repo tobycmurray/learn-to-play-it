@@ -25,10 +25,10 @@ LOOP_FILL_COLOR = QColor(255, 200, 40, 30)
 LOOP_SERIF = 6
 WAVEFORM_BG = QColor(30, 30, 35)
 WAVEFORM_PAD = 4
-MONO_FONT = "'Menlo', 'Courier New', monospace"
+MONO_FONT = "'Menlo', 'Courier New'"
 
-WINDOW_MIN_W = 900
-WINDOW_W = 900
+WINDOW_MIN_W = 1100
+WINDOW_W = 1100
 WINDOW_H = 600
 
 TRANSPORT_W = 200
@@ -392,6 +392,17 @@ class PlayerWidget(QWidget):
         row.addWidget(self.mode_status)
 
         row.addStretch()
+
+        self.click_btn = ActionButton("Enable Click", "B", minWidth=LOOP_W, icon_name="metronome")
+        self.click_btn.clicked.connect(lambda: self._cmd(lambda p: p.toggle_click()))
+        row.addWidget(self.click_btn)
+
+        row.addSpacing(16)
+
+        self.click_status = QLabel("")
+        self.click_status.setMinimumWidth(90)
+        row.addWidget(self.click_status)
+
         layout.addLayout(row)
 
     def _refresh(self):
@@ -415,6 +426,10 @@ class PlayerWidget(QWidget):
         for mode, btn in self._mode_buttons.items():
             btn.setEnabled(mode != p.mode)
         self.mode_status.setText(f"<b>Play mode:</b> {p.mode}")
+
+        self.click_btn.set_action("Disable Click" if p.click_active else "Enable Click", icon_name="metronome")
+        self.click_btn.setEnabled(p._click_track is not None)
+        self.click_status.setText(f"<b>Click:</b> {'on' if p.click_active else 'off'}")
 
         loop = p.loop
         can_toggle = loop is not None and loop.is_complete()
@@ -473,6 +488,7 @@ class GuiDisplay(QMainWindow):
             Qt.Key_3: lambda: self.player.set_mode("mix"),
             Qt.Key_H: lambda: self.player.toggle_hold(),
             Qt.Key_L: lambda: self.player.toggle_loop(),
+            Qt.Key_B: lambda: self.player.toggle_click(),
             Qt.Key_BracketLeft: lambda: self.player.set_loop_start(),
             Qt.Key_BracketRight: lambda: self.player.set_loop_end(),
         }

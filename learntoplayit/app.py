@@ -92,6 +92,23 @@ class SeparationWorker(QThread):
             sys.stderr = old_stderr
 
 
+class BeatDetectionWorker(QThread):
+    finished = Signal()
+    error = Signal(str)
+
+    def __init__(self, audio_file):
+        super().__init__()
+        self.audio_file = audio_file
+
+    def run(self):
+        try:
+            from .beats import ensure_beats
+            ensure_beats(self.audio_file)
+            self.finished.emit()
+        except Exception as e:
+            self.error.emit(str(e))
+
+
 PRESETS = {
     "practice": {"mode": "solo", "speed": 50, "label": "Practice — solo at 50% speed"},
     "play_along": {"mode": "backing", "speed": 100, "label": "Play Along — backing track at full speed"},
@@ -210,6 +227,9 @@ class AppWindow(QMainWindow):
         self._worker = None
         self._progress = None
         self._audio_file = None
+        self._beat_worker = None
+        self._beat_progress = None
+        self._pending_player_args = None
 
         self.setWindowTitle("Learn To Play It")
         self.setMinimumWidth(WINDOW_MIN_W)
@@ -269,6 +289,7 @@ class AppWindow(QMainWindow):
             Qt.Key_3: lambda: self._cmd(lambda p: p.set_mode("mix")),
             Qt.Key_H: lambda: self._cmd(lambda p: p.toggle_hold()),
             Qt.Key_L: lambda: self._cmd(lambda p: p.toggle_loop()),
+            Qt.Key_B: lambda: self._cmd(lambda p: p.toggle_click()),
             Qt.Key_BracketLeft: lambda: self._cmd(lambda p: p.set_loop_start()),
             Qt.Key_BracketRight: lambda: self._cmd(lambda p: p.set_loop_end()),
         }
@@ -352,6 +373,45 @@ class AppWindow(QMainWindow):
             self.player_widget._timer.stop()
             self.player.stop()
 
+        from .beats import beats_exist
+        if not beats_exist(audio_file):
+            self._pending_player_args = (stems_dir, audio_file, part, mode, speed, pitch, device)
+            self._beat_progress = QProgressDialog(
+                "Detecting beats…", None, 0, 0, self,
+            )
+            self._beat_progress.setWindowTitle("Detecting Beats")
+            self._beat_progress.setWindowModality(Qt.WindowModal)
+            self._beat_progress.setCancelButton(None)
+            self._beat_progress.show()
+
+            self._beat_worker = BeatDetectionWorker(audio_file)
+            self._beat_worker.finished.connect(self._on_beats_ready)
+            self._beat_worker.error.connect(self._on_beats_error)
+            self._beat_worker.start()
+            return
+
+        self._start_player(stems_dir, audio_file, part, mode, speed, pitch, device)
+
+    def _on_beats_ready(self):
+        if self._beat_progress:
+            self._beat_progress.close()
+            self._beat_progress = None
+        args = self._pending_player_args
+        self._pending_player_args = None
+        if args:
+            self._start_player(*args)
+
+    def _on_beats_error(self, error_msg):
+        if self._beat_progress:
+            self._beat_progress.close()
+            self._beat_progress = None
+        args = self._pending_player_args
+        self._pending_player_args = None
+        QMessageBox.warning(self, "Beat Detection Failed", f"Could not detect beats:\n{error_msg}\n\nContinuing without click track.")
+        if args:
+            self._start_player(*args)
+
+    def _start_player(self, stems_dir, audio_file, part, mode, speed, pitch, device=None):
         from .player import Player
         player = Player(stems_dir, part, initial_mode=mode, initial_speed=speed, initial_cents=pitch, device=device)
         try:
