@@ -124,13 +124,11 @@ class Player:
 
     def _load_click_track(self, stems_dir):
         from pathlib import Path
-        beats_path = Path(stems_dir) / "analysis" / "beats.json"
-        if not beats_path.exists():
+        from .beats import load_beats_from_dir, render_click_track
+
+        beats_data = load_beats_from_dir(Path(stems_dir))
+        if beats_data is None:
             return None
-        import json
-        with open(beats_path) as f:
-            beats_data = json.load(f)
-        from .beats import render_click_track
         return render_click_track(beats_data, self.song_len, self.sr, self.channels)
 
     def _compute_rms_peak(self, mix):

@@ -25,6 +25,14 @@ def load_beats(audio_file: str) -> dict:
         return json.load(f)
 
 
+def load_beats_from_dir(stems_dir: Path) -> dict | None:
+    path = stems_dir / "analysis" / "beats.json"
+    if not path.exists():
+        return None
+    with open(path) as f:
+        return json.load(f)
+
+
 def render_click_track(beats_data: dict, song_len: int, sr: int, channels: int) -> np.ndarray:
     """Render a click track as a numpy array matching song dimensions."""
     click_samples = int(CLICK_DURATION * sr)
@@ -34,7 +42,7 @@ def render_click_track(beats_data: dict, song_len: int, sr: int, channels: int) 
     downbeat_click = (np.sin(2 * np.pi * DOWNBEAT_FREQ * t) * envelope * CLICK_VOLUME).astype(np.float32)
     beat_click = (np.sin(2 * np.pi * BEAT_FREQ * t) * envelope * CLICK_VOLUME).astype(np.float32)
 
-    downbeat_samples = {int(t * sr) for t in beats_data["downbeats"]}
+    downbeat_samples = {int(db * sr) for db in beats_data["downbeats"]}
     track = np.zeros((song_len, channels), dtype=np.float32)
 
     for beat_time in beats_data["beats"]:

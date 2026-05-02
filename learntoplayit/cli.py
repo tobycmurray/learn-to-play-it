@@ -2,6 +2,7 @@ import shutil
 
 import click
 
+from .separate import STEM_NAMES
 
 def _check_prerequisites():
     missing = []
@@ -77,7 +78,7 @@ def devices():
 
 @main.command("detect-beat")
 @click.argument("audio_file", type=click.Path(exists=True))
-@click.option("--from", "from_stem", type=click.Choice(["vocals", "drums", "bass", "guitar", "piano", "other"]), default=None, help="Use a specific stem instead of the full mix")
+@click.option("--from", "from_stem", type=click.Choice(STEM_NAMES), default=None, help="Use a specific stem instead of the full mix")
 def detect_beat(audio_file, from_stem):
     """Detect beats and downbeats in a song."""
     from .beats import detect_beats, beats_exist
@@ -139,7 +140,7 @@ def parts(audio_file):
 
 @main.command()
 @click.argument("audio_file", type=click.Path(exists=True))
-@click.argument("part", type=click.Choice(["vocals", "drums", "bass", "guitar", "piano", "other"]))
+@click.argument("part", type=click.Choice(STEM_NAMES))
 @click.option("--speed", type=int, default=50, help="Initial speed as percentage (default: 50)")
 @click.option("--pitch", type=int, default=0, help="Initial pitch shift in cents (default: 0)")
 @click.option("--device", type=str, default=None, help="Audio output device (name or index)")
@@ -148,12 +149,11 @@ def practice(audio_file, part, speed, pitch, device, gui):
     """Practice a part: isolated, starting at 50% speed."""
     _validate_speed_pitch(speed, pitch)
     from .separate import ensure_stems
-    from .beats import ensure_beats
+    from .beats import beats_exist, ensure_beats
     from .player import Player
 
     stems_dir = ensure_stems(audio_file)
-    from .beats import beats_exist as _beats_exist
-    if not _beats_exist(audio_file):
+    if not beats_exist(audio_file):
         click.echo("Detecting beats...")
     ensure_beats(audio_file)
     player = Player(stems_dir, part, initial_mode="solo", initial_speed=speed / 100, initial_cents=pitch, device=_parse_device(device))
@@ -185,12 +185,11 @@ def play_along(audio_file, part, speed, pitch, device, gui):
     """Play along with the song, your part removed."""
     _validate_speed_pitch(speed, pitch)
     from .separate import ensure_stems
-    from .beats import ensure_beats
+    from .beats import beats_exist, ensure_beats
     from .player import Player
 
     stems_dir = ensure_stems(audio_file)
-    from .beats import beats_exist as _beats_exist
-    if not _beats_exist(audio_file):
+    if not beats_exist(audio_file):
         click.echo("Detecting beats...")
     ensure_beats(audio_file)
     player = Player(stems_dir, part, initial_mode="backing", initial_speed=speed / 100, initial_cents=pitch, device=_parse_device(device))

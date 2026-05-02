@@ -217,6 +217,23 @@ class SetupDialog(QDialog):
         return self._device_combo.currentData()
 
 
+class _PipelineState:
+    """Holds state for the async open-file pipeline (separation → beat detection → player)."""
+
+    def __init__(self, audio_file):
+        self.audio_file = audio_file
+        self.stems_dir = None
+        self.player_args = None
+        self.worker = None
+        self.progress = None
+
+    def cleanup(self):
+        if self.progress:
+            self.progress.close()
+        self.progress = None
+        self.worker = None
+
+
 class AppWindow(QMainWindow):
 
     def __init__(self, app):
@@ -224,12 +241,7 @@ class AppWindow(QMainWindow):
         super().__init__()
 
         self.player = None
-        self._worker = None
-        self._progress = None
-        self._audio_file = None
-        self._beat_worker = None
-        self._beat_progress = None
-        self._pending_player_args = None
+        self._pipeline = None
 
         self.setWindowTitle("Learn To Play It")
         self.setMinimumWidth(WINDOW_MIN_W)
@@ -318,49 +330,57 @@ class AppWindow(QMainWindow):
             )
             return
 
-        self._start_separation(path)
+        self._start_pipeline(path)
 
-    def _start_separation(self, audio_file):
+    def _start_pipeline(self, audio_file):
+        """Entry point for the open-file pipeline: separation → setup → beats → player."""
         from .separate import stems_exist, get_stems_dir
 
+        self._pipeline = _PipelineState(audio_file)
+
         if stems_exist(audio_file):
-            self._on_stems_ready(str(get_stems_dir(audio_file)), audio_file)
+            self._pipeline.stems_dir = str(get_stems_dir(audio_file))
+            self._pipeline_show_setup()
             return
 
-        self._audio_file = audio_file
-        self._progress = QProgressDialog(
+        self._pipeline.progress = QProgressDialog(
             "Separating stems…", None, 0, 100, self,
         )
-        self._progress.setWindowTitle("Separating")
-        self._progress.setWindowModality(Qt.WindowModal)
-        self._progress.setCancelButton(None)
-        self._progress.setValue(0)
-        self._progress.show()
+        self._pipeline.progress.setWindowTitle("Separating")
+        self._pipeline.progress.setWindowModality(Qt.WindowModal)
+        self._pipeline.progress.setCancelButton(None)
+        self._pipeline.progress.setValue(0)
+        self._pipeline.progress.show()
 
-        self._worker = SeparationWorker(audio_file)
-        self._worker.progress.connect(self._progress.setValue)
-        self._worker.finished.connect(self._on_separation_done)
-        self._worker.error.connect(self._on_separation_error)
-        self._worker.start()
+        self._pipeline.worker = SeparationWorker(audio_file)
+        self._pipeline.worker.progress.connect(self._pipeline.progress.setValue)
+        self._pipeline.worker.finished.connect(self._on_separation_done)
+        self._pipeline.worker.error.connect(self._on_separation_error)
+        self._pipeline.worker.start()
 
     def _on_separation_done(self, stems_dir):
-        if self._progress:
-            self._progress.close()
-            self._progress = None
-        self._on_stems_ready(stems_dir, self._audio_file)
+        if self._pipeline is None:
+            return
+        self._pipeline.cleanup()
+        self._pipeline.stems_dir = stems_dir
+        self._pipeline_show_setup()
 
     def _on_separation_error(self, error_msg):
-        if self._progress:
-            self._progress.close()
-            self._progress = None
+        if self._pipeline is None:
+            return
+        self._pipeline.cleanup()
+        self._pipeline = None
         QMessageBox.critical(self, "Separation Failed", f"Error separating stems:\n{error_msg}")
 
-    def _on_stems_ready(self, stems_dir, audio_file):
+    def _pipeline_show_setup(self):
         dialog = SetupDialog(self)
         if dialog.exec() != QDialog.Accepted:
+            self._pipeline = None
             return
-        self._load_player(
-            stems_dir, audio_file,
+
+        self._pipeline.player_args = dict(
+            stems_dir=self._pipeline.stems_dir,
+            audio_file=self._pipeline.audio_file,
             part=dialog.selected_part(),
             mode=dialog.selected_mode(),
             speed=dialog.selected_speed(),
@@ -368,52 +388,57 @@ class AppWindow(QMainWindow):
             device=dialog.selected_device(),
         )
 
-    def _load_player(self, stems_dir, audio_file, part, mode, speed, pitch, device=None):
         if self.player is not None:
             self.player_widget._timer.stop()
             self.player.stop()
+            self.player = None
 
+        self._pipeline_ensure_beats()
+
+    def _pipeline_ensure_beats(self):
         from .beats import beats_exist
-        if not beats_exist(audio_file):
-            self._pending_player_args = (stems_dir, audio_file, part, mode, speed, pitch, device)
-            self._beat_progress = QProgressDialog(
-                "Detecting beats…", None, 0, 0, self,
-            )
-            self._beat_progress.setWindowTitle("Detecting Beats")
-            self._beat_progress.setWindowModality(Qt.WindowModal)
-            self._beat_progress.setCancelButton(None)
-            self._beat_progress.show()
 
-            self._beat_worker = BeatDetectionWorker(audio_file)
-            self._beat_worker.finished.connect(self._on_beats_ready)
-            self._beat_worker.error.connect(self._on_beats_error)
-            self._beat_worker.start()
+        if beats_exist(self._pipeline.audio_file):
+            self._pipeline_start_player()
             return
 
-        self._start_player(stems_dir, audio_file, part, mode, speed, pitch, device)
+        self._pipeline.progress = QProgressDialog(
+            "Detecting beats…", None, 0, 0, self,
+        )
+        self._pipeline.progress.setWindowTitle("Detecting Beats")
+        self._pipeline.progress.setWindowModality(Qt.WindowModal)
+        self._pipeline.progress.setCancelButton(None)
+        self._pipeline.progress.show()
+
+        self._pipeline.worker = BeatDetectionWorker(self._pipeline.audio_file)
+        self._pipeline.worker.finished.connect(self._on_beats_ready)
+        self._pipeline.worker.error.connect(self._on_beats_error)
+        self._pipeline.worker.start()
 
     def _on_beats_ready(self):
-        if self._beat_progress:
-            self._beat_progress.close()
-            self._beat_progress = None
-        args = self._pending_player_args
-        self._pending_player_args = None
-        if args:
-            self._start_player(*args)
+        if self._pipeline is None:
+            return
+        self._pipeline.cleanup()
+        self._pipeline_start_player()
 
     def _on_beats_error(self, error_msg):
-        if self._beat_progress:
-            self._beat_progress.close()
-            self._beat_progress = None
-        args = self._pending_player_args
-        self._pending_player_args = None
+        if self._pipeline is None:
+            return
+        self._pipeline.cleanup()
         QMessageBox.warning(self, "Beat Detection Failed", f"Could not detect beats:\n{error_msg}\n\nContinuing without click track.")
-        if args:
-            self._start_player(*args)
+        self._pipeline_start_player()
 
-    def _start_player(self, stems_dir, audio_file, part, mode, speed, pitch, device=None):
+    def _pipeline_start_player(self):
+        args = self._pipeline.player_args
+        self._pipeline = None
+
+        if args is None:
+            return
+
         from .player import Player
-        player = Player(stems_dir, part, initial_mode=mode, initial_speed=speed, initial_cents=pitch, device=device)
+        player = Player(args["stems_dir"], args["part"], initial_mode=args["mode"],
+                        initial_speed=args["speed"], initial_cents=args["pitch"],
+                        device=args["device"])
         try:
             player.start()
         except Exception as e:
@@ -428,8 +453,8 @@ class AppWindow(QMainWindow):
         self.welcome.hide()
         self.player_widget.show()
 
-        filename = Path(audio_file).name
-        self.setWindowTitle(f"Learn To Play It — {filename} — {part}")
+        filename = Path(args["audio_file"]).name
+        self.setWindowTitle(f"Learn To Play It — {filename} — {args['part']}")
 
     def closeEvent(self, event):
         if self.player is not None:
