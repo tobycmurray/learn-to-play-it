@@ -6,6 +6,8 @@
 #
 antlr4-python3-runtime==4.9.3
     # via omegaconf
+beat-this==1.1.0
+    # via learn-to-play-it (pyproject.toml)
 cffi==2.0.0
     # via
     #   sounddevice
@@ -19,7 +21,10 @@ demucs==4.0.1
 dora-search==0.1.12
     # via demucs
 einops==0.8.2
-    # via demucs
+    # via
+    #   beat-this
+    #   demucs
+    #   rotary-embedding-torch
 filelock==3.29.0
     # via torch
 fsspec==2026.4.0
@@ -38,10 +43,12 @@ networkx==3.6.1
     # via torch
 numpy==2.4.4
     # via
+    #   beat-this
     #   learn-to-play-it (pyproject.toml)
     #   openunmix
     #   pylibrb
     #   soundfile
+    #   soxr
 omegaconf==2.3.0
     # via dora-search
 openunmix==1.3.0
@@ -64,6 +71,8 @@ pyyaml==6.0.3
     #   omegaconf
 retrying==1.4.2
     # via dora-search
+rotary-embedding-torch==0.8.9
+    # via beat-this
 shiboken6==6.11.0
     # via
     #   pyside6
@@ -73,18 +82,23 @@ sounddevice==0.5.5
     # via learn-to-play-it (pyproject.toml)
 soundfile==0.13.1
     # via learn-to-play-it (pyproject.toml)
+soxr==1.0.0
+    # via beat-this
 submitit==1.5.4
     # via dora-search
 sympy==1.14.0
     # via torch
 torch==2.11.0
     # via
+    #   beat-this
     #   demucs
     #   dora-search
     #   julius
     #   openunmix
+    #   rotary-embedding-torch
 torchaudio==2.11.0
     # via
+    #   beat-this
     #   demucs
     #   openunmix
 torchcodec==0.11.1

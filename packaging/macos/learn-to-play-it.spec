@@ -60,6 +60,7 @@ hiddenimports += [
 for package in [
     "learntoplayit",
     "demucs",
+    "beat_this",
     "torch",
     "torchaudio",
     "torchcodec",

@@ -36,6 +36,16 @@ def load_beats_from_dir(stems_dir: Path) -> dict | None:
 COUNTIN_WARMUP = 0.1
 
 
+def _make_clicks(sr: int) -> tuple[np.ndarray, np.ndarray, int]:
+    """Synthesise downbeat and beat click waveforms. Returns (downbeat, beat, click_samples)."""
+    click_samples = int(CLICK_DURATION * sr)
+    t = np.arange(click_samples) / sr
+    envelope = np.exp(-t * 40)
+    downbeat = (np.sin(2 * np.pi * DOWNBEAT_FREQ * t) * envelope * CLICK_VOLUME).astype(np.float32)
+    beat = (np.sin(2 * np.pi * BEAT_FREQ * t) * envelope * CLICK_VOLUME).astype(np.float32)
+    return downbeat, beat, click_samples
+
+
 def compute_count_in(beats_data: dict, sr: int, channels: int) -> tuple[np.ndarray, int] | None:
     """Compute a count-in click track leading into the first downbeat.
 
@@ -57,11 +67,7 @@ def compute_count_in(beats_data: dict, sr: int, channels: int) -> tuple[np.ndarr
 
     count_in_times = [first_downbeat - (n_beats - i) * beat_interval for i in range(n_beats)]
 
-    click_samples = int(CLICK_DURATION * sr)
-    t = np.arange(click_samples) / sr
-    envelope = np.exp(-t * 40)
-    downbeat_click = (np.sin(2 * np.pi * DOWNBEAT_FREQ * t) * envelope * CLICK_VOLUME).astype(np.float32)
-    beat_click = (np.sin(2 * np.pi * BEAT_FREQ * t) * envelope * CLICK_VOLUME).astype(np.float32)
+    downbeat_click, beat_click, click_samples = _make_clicks(sr)
 
     warmup_samples = int(COUNTIN_WARMUP * sr)
     count_in_samples = int(abs(count_in_times[0]) * sr) + warmup_samples
@@ -85,12 +91,7 @@ def compute_count_in(beats_data: dict, sr: int, channels: int) -> tuple[np.ndarr
 
 def render_click_track(beats_data: dict, song_len: int, sr: int, channels: int) -> np.ndarray:
     """Render a click track as a numpy array matching song dimensions."""
-    click_samples = int(CLICK_DURATION * sr)
-    t = np.arange(click_samples) / sr
-    envelope = np.exp(-t * 40)
-
-    downbeat_click = (np.sin(2 * np.pi * DOWNBEAT_FREQ * t) * envelope * CLICK_VOLUME).astype(np.float32)
-    beat_click = (np.sin(2 * np.pi * BEAT_FREQ * t) * envelope * CLICK_VOLUME).astype(np.float32)
+    downbeat_click, beat_click, click_samples = _make_clicks(sr)
 
     downbeat_samples = {int(db * sr) for db in beats_data["downbeats"]}
     track = np.zeros((song_len, channels), dtype=np.float32)

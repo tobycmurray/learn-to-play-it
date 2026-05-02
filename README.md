@@ -96,6 +96,8 @@ Opens an interactive playback session with the bass part isolated, starting at 5
 | `[`/`]` | Set loop start / end                  |
 | `L`     | Toggle loop on/off                    |
 | `H`     | Hold — freeze last 200ms and loop it |
+| `B`     | Toggle click track (metronome)       |
+| `N`     | Toggle count-in                       |
 | `1`/`2`/`3` | Mode: solo / backing / mix        |
 | `0`     | Restart (or loop start if looping)    |
 | `Q`     | Quit                                  |
@@ -119,10 +121,10 @@ These keys follow a visual layout, shown below:
   |     |speed|pitch|     |     |hold |     |     |on / |     |     |     |
   |     |down |down |     |     |note |     |     |off  |     |     |     |
   +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
-  |  Z  |  X  |  C  |  V  |     |     |     |     |     |     |     |     |
+  |  Z  |  X  |  C  |  V  |  B  |  N  |     |     |     |     |     |     |
   |skip |nudge|nudge|skip |     |     |     |     |     |     |     |     |
-  |back |back | fwd | fwd |     |     |     |     |     |     |     |     |
-  | <<  |  <  |  >  | >>  |     |     |     |     |     |     |     |     |
+  |back |back | fwd | fwd |click|count|     |     |     |     |     |     |
+  | <<  |  <  |  >  | >>  |track| in  |     |     |     |     |     |     |
   +-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+-----+
 
         SPACE = play/pause    0 = restart    1/2/3 = solo/backing/mix
@@ -131,20 +133,19 @@ These keys follow a visual layout, shown below:
 
 A waveform is rendered when playback is paused, allowing precise control of loop start and end points:
 ```
-Playing: guitar (solo)
 Controls: SPACE=play/pause  W/S=speed  E/D=pitch  Z/X/C/V=seek  H=hold
-          [/]=loop start/end  L=loop  1/2/3=solo/backing/mix  0=restart  Q=quit
+          [/]=loop start/end  L=loop  B=click  N=count-in  1/2/3=solo/backing/mix  0=restart  Q=quit
 
-  ⏸ 0:13.31 / 3:19.22  |  speed: 50%  |  pitch: 0c  |  loop: OFF 0:11.70-0:14.41  |  mode: solo  |  part: guitar
-
-                                                                                                                                ▆
-                                                                                                                                █
-                                                                                                 ▇        ▇       ▃        ▅    █▁
-                                                     ▁            ▁                              █        █       █▁       █   ▅██▄▁     ▃  ▁
-     ▁   ▁ ▁ ▁▂▂ ▁▁   ▁▁▁ ▅▁▁      ▁   ▆▃▁           █▁           █▂       ▂▂                    █       ▇█       ██       █▄  █████▁   ▂█▅▁█
-  ▄▃▆█▇▇▆█▇█▅███▇██▆▅▃███▇███▅▃▅▅▃▁█▅▅▄███▇▅▅▂▃▂▄▆▃▃▇██▅▃▃▃▃▁▂▅▂▁▁██▇▄▄▃▁▁▁██▇▆▆       ▁ ▁      ▄█▇      ██▆▁     ██▃      ██▆▂██████▅▅▃█████
-  ██████████████████████████████████████████████████████████████████████████████▆▆▇▇▇▇▇█▇█▇▆▅▄▂▂███▇▅▃▃▂▁████▅▄▃▃▂███▇▆▄▃▂▂██████████████████
-                                      [                                ↑                     ]
+  ⏸ 0:03.88 / 3:19.22  |  speed: 70%  |  pitch: 0c  |  loop: ON 0:00.47-0:07.54  |  click: ON  |  count-in: ON  |  mode: mix  |  part: guitar   
+                                                                                                                                ▂               
+                                                                                                                                █               
+                                                                                                                                █       ▆▂      
+                                                                                                                                █▂      ██▂     
+                                                                                                                                ██▂     ███▂▁▁  
+                                                                                                                                ███▆▆▁▁▂██████  
+    ▃▄▂▁ ▁▁▁▁▁   ▁▂▁▁     ▁▁▁  ▁          ▁ ▂▃▃▁▁▁  ▂▄▂▂▂▃▂▁▁▁▁▁▁▁▁▁   ▁  ▁▂▁▁▁▁    ▁   ▅▅▃▂▁▁   ▁▁  ▁▃▁  ▁   ▁    ▄▃▁▁▁    ▁▁▁▇██████████████  
+  ▁▁████▇█████▇▇▆████▇▆▆▆▅███▇▆█▇▆▆▆▆▆▅▅▆▆█▇██████▇▇████████████████▇▆▇█▇▇██████▇▇▆▅█▇▆▅██████▇▆▇██▆▇███▇▆█▇▇▆█▇▆▅▅█████▇▇▇▇██████████████████  
+    [                                                                   ↑                                                                       
 ```
 
 **Modes** -- chosen using number keys 1 (solo), 2 (backing), and 3(mix):
@@ -170,6 +171,20 @@ ltpi parts song.mp3
 ```
 
 Shows which stems are available after separation.
+
+### Detect beats
+
+```bash
+ltpi detect-beat song.mp3
+```
+
+Runs beat and downbeat detection on the audio file. This is done automatically when you start practicing, but you can run it manually to inspect the results. The detected tempo (BPM) and time signature are printed, and the data is cached alongside the stems.
+
+Use `--from` to run detection on a specific stem instead of the full mix (requires stems to be separated first):
+
+```bash
+ltpi detect-beat song.mp3 --from drums
+```
 
 ### Delete cached stems
 
@@ -205,6 +220,7 @@ Use `--stems-dir` to store stems in a custom location (default: `./stems`).
 ## How it works
 
 - **Source separation**: [Demucs](https://github.com/adefossez/demucs) (Meta Research) splits audio into six stems: vocals, drums, bass, guitar, piano, and other
+- **Beat detection**: [beat_this](https://github.com/CPJKU/beat_this) (CPJKU, ISMIR 2024) detects beat and downbeat positions, providing a click track and count-in for practice
 - **Time-stretching & pitch-shifting**: [Rubber Band](https://breakfastquay.com/rubberband/) (via [pylibrb](https://github.com/pawel-glomski/pylibrb)) processes audio in real-time — speed and pitch changes are instant with no playback pause
 - **Playback**: [sounddevice](https://python-sounddevice.readthedocs.io/) provides low-latency audio output
 
@@ -233,5 +249,6 @@ ltpi practice song.mp3 guitar
 
 ## Possible future directions
 
-- MIDI / guitar tab transcription from isolated parts
+- MIDI / guitar tab transcription from isolated stems
+- Adjustable count-in beat count (for non-4/4 time signatures)
 - Standalone macOS app bundle

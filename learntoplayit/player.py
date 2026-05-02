@@ -101,9 +101,8 @@ class Player:
         self.channels = self.mixes["solo"].shape[1] if self.mixes["solo"].ndim > 1 else 1
         self.song_len = len(self.mixes["solo"])
 
-        self._click_track = self._load_click_track(stems_dir)
+        self._click_track, self._count_in_track, self._count_in_samples = self._load_beats(stems_dir)
         self.click_active = self._click_track is not None
-        self._count_in_track, self._count_in_samples = self._load_count_in(stems_dir)
         self.count_in_enabled = self._count_in_track is not None
         self._mix_peaks = {mode: self._compute_rms_peak(mix) for mode, mix in self.mixes.items()}
 
@@ -124,26 +123,20 @@ class Player:
         self._feeder_paused = False
         self._feeder_thread = None
 
-    def _load_click_track(self, stems_dir):
+    def _load_beats(self, stems_dir):
         from pathlib import Path
-        from .beats import load_beats_from_dir, render_click_track
+        from .beats import load_beats_from_dir, render_click_track, compute_count_in
 
         beats_data = load_beats_from_dir(Path(stems_dir))
         if beats_data is None:
-            return None
-        return render_click_track(beats_data, self.song_len, self.sr, self.channels)
+            return None, None, 0
 
-    def _load_count_in(self, stems_dir):
-        from pathlib import Path
-        from .beats import load_beats_from_dir, compute_count_in
+        click_track = render_click_track(beats_data, self.song_len, self.sr, self.channels)
 
-        beats_data = load_beats_from_dir(Path(stems_dir))
-        if beats_data is None:
-            return None, 0
-        result = compute_count_in(beats_data, self.sr, self.channels)
-        if result is None:
-            return None, 0
-        return result
+        ci_result = compute_count_in(beats_data, self.sr, self.channels)
+        if ci_result is None:
+            return click_track, None, 0
+        return click_track, ci_result[0], ci_result[1]
 
     def _compute_rms_peak(self, mix):
         bin_samples = int(NUDGE_SECONDS * self.sr)
@@ -498,9 +491,3 @@ class Player:
             self._stream.close()
 
 
-def play_interactive(stems_dir, part, initial_mode="solo", initial_speed=0.5, initial_cents=0.0, device=None):
-    from .display import TerminalDisplay
-
-    player = Player(stems_dir, part, initial_mode, initial_speed, initial_cents, device=device)
-    display = TerminalDisplay(player)
-    display.run()
