@@ -109,7 +109,7 @@ def detect_beat(audio_file, from_stem):
 @click.argument("audio_file", type=click.Path(exists=True))
 def separate(audio_file):
     """Separate a song into individual instrument stems."""
-    from .separate import separate_stems, stems_exist, get_stems_dir, STEM_NAMES
+    from .separate import separate_stems, stems_exist, get_stems_dir, available_stems
 
     if stems_exist(audio_file):
         stems_dir = get_stems_dir(audio_file)
@@ -119,7 +119,7 @@ def separate(audio_file):
         stems_dir = separate_stems(audio_file)
         click.echo(f"Done. Stems saved to {stems_dir}/")
 
-    for name in STEM_NAMES:
+    for name in available_stems(audio_file):
         click.echo(f"  {name}.wav")
 
 
@@ -127,18 +127,16 @@ def separate(audio_file):
 @click.argument("audio_file", type=click.Path(exists=True))
 def parts(audio_file):
     """List available stems for a song."""
-    from .separate import get_stems_dir, STEM_NAMES
+    from .separate import available_stems, stems_exist
 
-    stems_dir = get_stems_dir(audio_file)
-    if not stems_dir.exists():
+    if not stems_exist(audio_file):
         click.echo(f"No stems found. Run 'ltpi separate {audio_file}' first.")
         raise SystemExit(1)
 
+    parts = available_stems(audio_file)
     click.echo(f"Available parts for {audio_file}:")
-    for name in STEM_NAMES:
-        stem_path = stems_dir / f"{name}.wav"
-        if stem_path.exists():
-            click.echo(f"  {name}")
+    for name in parts:
+        click.echo(f"  {name}")
 
 
 @main.command()

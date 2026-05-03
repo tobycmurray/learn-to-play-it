@@ -120,18 +120,20 @@ PRESETS = {
 
 class SetupDialog(QDialog):
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, stems=None):
         super().__init__(parent)
         self.setWindowTitle("Setup")
         layout = QVBoxLayout(self)
+        print(stems)
+        self.stems = stems
 
         layout.addWidget(QLabel("Part"))
         self._part_buttons = {}
-        for name in STEM_NAMES:
+        for name in stems:
             btn = QRadioButton(name)
             layout.addWidget(btn)
             self._part_buttons[name] = btn
-        self._part_buttons[STEM_NAMES[0]].setChecked(True)
+        self._part_buttons[stems[0]].setChecked(True)
 
         sep = QFrame()
         sep.setFrameShape(QFrame.HLine)
@@ -204,7 +206,7 @@ class SetupDialog(QDialog):
         for name, btn in self._part_buttons.items():
             if btn.isChecked():
                 return name
-        return STEM_NAMES[0]
+        return self.stems[0]
 
     def selected_mode(self):
         preset = PRESETS["practice"] if self._practice_btn.isChecked() else PRESETS["play_along"]
@@ -338,12 +340,13 @@ class AppWindow(QMainWindow):
 
     def _start_pipeline(self, audio_file):
         """Entry point for the open-file pipeline: separation → setup → beats → player."""
-        from .separate import stems_exist, get_stems_dir
+        from .separate import stems_exist, get_stems_dir, available_stems
 
         self._pipeline = _PipelineState(audio_file)
 
         if stems_exist(audio_file):
             self._pipeline.stems_dir = str(get_stems_dir(audio_file))
+            self._pipeline.stems = available_stems(audio_file)
             self._pipeline_show_setup()
             return
 
@@ -363,10 +366,12 @@ class AppWindow(QMainWindow):
         self._pipeline.worker.start()
 
     def _on_separation_done(self, stems_dir):
+        from .separate import available_stems_from_dir
         if self._pipeline is None:
             return
         self._pipeline.cleanup()
         self._pipeline.stems_dir = stems_dir
+        self._pipeline.stems = available_stems_from_dir(stems_dir)
         self._pipeline_show_setup()
 
     def _on_separation_error(self, error_msg):
@@ -377,7 +382,7 @@ class AppWindow(QMainWindow):
         QMessageBox.critical(self, "Separation Failed", f"Error separating stems:\n{error_msg}")
 
     def _pipeline_show_setup(self):
-        dialog = SetupDialog(self)
+        dialog = SetupDialog(self, self._pipeline.stems)
         if dialog.exec() != QDialog.Accepted:
             self._pipeline = None
             return

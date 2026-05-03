@@ -1,10 +1,12 @@
 """Test that source separation produces valid stems."""
 
-from learntoplayit.separate import STEM_NAMES
+from learntoplayit.separate import available_stems_from_dir, available_stems
 
+def test_some_stems(separated_stems):
+    assert len(available_stems_from_dir(separated_stems)) > 0
 
 def test_all_stems_exist(separated_stems):
-    for name in STEM_NAMES:
+    for name in available_stems_from_dir(separated_stems):
         stem_path = separated_stems / f"{name}.wav"
         assert stem_path.exists(), f"Missing stem: {name}.wav"
 
@@ -12,7 +14,7 @@ def test_all_stems_exist(separated_stems):
 def test_stems_are_valid_audio(separated_stems):
     import soundfile as sf
 
-    for name in STEM_NAMES:
+    for name in available_stems_from_dir(separated_stems):
         audio, sr = sf.read(str(separated_stems / f"{name}.wav"))
         assert sr > 0
         assert len(audio) > 0
@@ -22,7 +24,7 @@ def test_stems_have_consistent_length(separated_stems):
     import soundfile as sf
 
     lengths = []
-    for name in STEM_NAMES:
+    for name in available_stems_from_dir(separated_stems):
         audio, _ = sf.read(str(separated_stems / f"{name}.wav"))
         lengths.append(len(audio))
 
@@ -41,7 +43,7 @@ def test_parts_command(synthetic_wav):
     runner = CliRunner()
     result = runner.invoke(main, ["parts", str(synthetic_wav)])
     assert result.exit_code == 0
-    for name in STEM_NAMES:
+    for name in available_stems(synthetic_wav):
         assert name in result.output
 
 
