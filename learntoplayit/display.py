@@ -11,7 +11,14 @@ from .fmt import fmt_time, fmt_pitch
 
 WAVEFORM_BLOCKS = " ▁▂▃▄▅▆▇█"
 WAVEFORM_ROWS = 8
-DISPLAY_LINES = 1 + WAVEFORM_ROWS + 1
+
+# we mirror the amplitude histogram to approximate what the GUI renders
+# although we don't (yet) bother to invert the WAVEFORM_BLOCKS characters in the mirror
+# the mirror has one less row than the histogram because we don't want to duplicate the
+# zero line. Along with the failure to invert the block characters, this means it isn't
+# really a very accurat emirror, but the result is intelligible and good enough for now
+#             pad    histogram       histogram mirror    pad
+DISPLAY_LINES = 1 + WAVEFORM_ROWS + (WAVEFORM_ROWS - 1) + 1
 
 
 def _read_key(timeout=0.1):
@@ -33,7 +40,7 @@ class TerminalDisplay:
 
     def run(self):
         p = self.player
-        print(f"Playing: {p.part} ({p.mode})")
+        print(f"Playing: {p.part}")
         print("Controls: SPACE=play/pause  W/S=speed  E/D=pitch  Z/X/C/V=seek  H=hold")
         print("          [/]=loop start/end  L=loop  B=click  N=count-in  1/2/3=solo/backing/mix  0=restart  Q=quit")
         print()
@@ -96,6 +103,11 @@ class TerminalDisplay:
                 else:
                     line.append(" ")
             rows.append("".join(line))
+        # mirror it
+        for row in range(len(rows) - 2, -1, -1):
+            line = rows[row]
+            rows.append(line)
+
         return rows
 
     @staticmethod
