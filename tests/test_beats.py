@@ -76,18 +76,17 @@ class TestComputeCountIn:
     def test_returns_tuple(self, beats_data_4_4):
         result = compute_count_in(beats_data_4_4, SR, CHANNELS)
         assert result is not None
-        track, ci_samples = result
+        track, ci_start = result
         assert isinstance(track, np.ndarray)
-        assert isinstance(ci_samples, int)
-        assert ci_samples > 0
+        assert isinstance(ci_start, int)
 
     def test_track_shape(self, beats_data_4_4):
-        track, ci_samples = compute_count_in(beats_data_4_4, SR, CHANNELS)
+        track, ci_start = compute_count_in(beats_data_4_4, SR, CHANNELS)
         assert track.ndim == 2
         assert track.shape[1] == CHANNELS
 
     def test_correct_number_of_clicks_4_4(self, beats_data_4_4):
-        track, ci_samples = compute_count_in(beats_data_4_4, SR, CHANNELS)
+        track, ci_start = compute_count_in(beats_data_4_4, SR, CHANNELS)
         mono = track[:, 0]
         nonzero = np.where(mono != 0)[0]
         clicks = []
@@ -99,7 +98,7 @@ class TestComputeCountIn:
         assert len(clicks) == 4
 
     def test_correct_number_of_clicks_3_4(self, beats_data_3_4):
-        track, ci_samples = compute_count_in(beats_data_3_4, SR, CHANNELS)
+        track, ci_start = compute_count_in(beats_data_3_4, SR, CHANNELS)
         mono = track[:, 0]
         nonzero = np.where(mono != 0)[0]
         clicks = []
@@ -111,11 +110,11 @@ class TestComputeCountIn:
         assert len(clicks) == 3
 
     def test_last_click_near_first_downbeat(self, beats_data_4_4):
-        track, ci_samples = compute_count_in(beats_data_4_4, SR, CHANNELS)
+        track, ci_start = compute_count_in(beats_data_4_4, SR, CHANNELS)
         first_downbeat = beats_data_4_4["downbeats"][0]
         beat_interval = 60.0 / beats_data_4_4["summary"]["bpm"]
         expected_last_click_time = first_downbeat - beat_interval
-        expected_pos = int(expected_last_click_time * SR) + ci_samples
+        expected_pos = int(expected_last_click_time * SR) - ci_start
         # Find last click
         mono = track[:, 0]
         nonzero = np.where(mono != 0)[0]
@@ -129,7 +128,7 @@ class TestComputeCountIn:
         assert abs(clicks[-1] - expected_pos) <= 2
 
     def test_click_spacing_matches_bpm(self, beats_data_4_4):
-        track, ci_samples = compute_count_in(beats_data_4_4, SR, CHANNELS)
+        track, ci_start = compute_count_in(beats_data_4_4, SR, CHANNELS)
         mono = track[:, 0]
         nonzero = np.where(mono != 0)[0]
         clicks = []
@@ -156,9 +155,9 @@ class TestComputeCountIn:
         assert compute_count_in(data, SR, CHANNELS) is None
 
     def test_index_mapping(self, beats_data_4_4):
-        """array_idx = pos_orig + count_in_samples; at pos_orig=0, array_idx=ci_samples."""
-        track, ci_samples = compute_count_in(beats_data_4_4, SR, CHANNELS)
-        assert ci_samples < len(track)
+        """array_idx = pos_orig - count_in_start; at pos_orig=0, array_idx=-ci_start."""
+        track, ci_start = compute_count_in(beats_data_4_4, SR, CHANNELS)
+        assert ci_start < 0
 
     def test_warmup_padding(self, beats_data_4_4):
         """First click should not be at array index 0 (warmup space before it)."""

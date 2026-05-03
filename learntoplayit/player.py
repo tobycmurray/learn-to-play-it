@@ -101,7 +101,8 @@ class Player:
         self.channels = self.mixes["solo"].shape[1] if self.mixes["solo"].ndim > 1 else 1
         self.song_len = len(self.mixes["solo"])
 
-        self._click_track, self._count_in_track, self._count_in_samples = self._load_beats(stems_dir)
+        self._click_track, self._count_in_track, self._count_in_start = self._load_beats(stems_dir)
+
         self.click_active = self._click_track is not None
         self.count_in_enabled = self._count_in_track is not None
         self._mix_peaks = {mode: self._compute_rms_peak(mix) for mode, mix in self.mixes.items()}
@@ -226,12 +227,10 @@ class Player:
                 block[silent_part:] += self._click_track[0:audio_part]
 
         if self.count_in_enabled and self._count_in_track is not None:
-            ci_idx = pos + self._count_in_samples
+            ci_idx = pos - self._count_in_start
             ci_end = min(ci_idx + block_size, len(self._count_in_track))
-            if ci_idx < len(self._count_in_track) and ci_end > 0:
-                src_start = max(0, ci_idx)
-                dst_start = src_start - ci_idx
-                block[dst_start:dst_start + (ci_end - src_start)] += self._count_in_track[src_start:ci_end]
+            if pos >= self._count_in_start and pos < self._count_in_start + len(self._count_in_track):
+                block[0:(ci_end - ci_idx)] += self._count_in_track[ci_idx:ci_end]
 
         return block
 
@@ -441,8 +440,8 @@ class Player:
 
     @property
     def _start_pos(self):
-        if self.count_in_enabled and self._count_in_samples > 0:
-            return -self._count_in_samples
+        if self.count_in_enabled and self._count_in_start < 0:
+            return self._count_in_start
         return 0
 
     def restart(self):
@@ -489,5 +488,3 @@ class Player:
         if self._stream is not None:
             self._stream.stop()
             self._stream.close()
-
-

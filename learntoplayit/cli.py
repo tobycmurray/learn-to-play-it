@@ -94,12 +94,15 @@ def detect_beat(audio_file, from_stem):
     click.echo(f"Detecting beats in {audio_file}...")
     result = detect_beats(audio_file, from_stem=from_stem)
 
-    summary = result["summary"]
-    n_beats = len(result["beats"])
-    n_downbeats = len(result["downbeats"])
-    click.echo(f"Done. {n_beats} beats, {n_downbeats} downbeats.")
-    click.echo(f"  Tempo: {summary['bpm']} BPM")
-    click.echo(f"  Time signature: {summary['time_signature']}")
+    if result is None:
+        click.echo("Failed to detect beats.")
+    else:
+        summary = result["summary"]
+        n_beats = len(result["beats"])
+        n_downbeats = len(result["downbeats"])
+        click.echo(f"Done. {n_beats} beats, {n_downbeats} downbeats.")
+        click.echo(f"  Tempo: {summary['bpm']} BPM")
+        click.echo(f"  Time signature: {summary['time_signature']}")
 
 
 @main.command()
@@ -155,7 +158,9 @@ def practice(audio_file, part, speed, pitch, device, gui):
     stems_dir = ensure_stems(audio_file)
     if not beats_exist(audio_file):
         click.echo("Detecting beats...")
-    ensure_beats(audio_file)
+    res = ensure_beats(audio_file)
+    if res is None:
+        click.echo("Couldn't detect beats. Continuing without click track and count-in.")
     player = Player(stems_dir, part, initial_mode="solo", initial_speed=speed / 100, initial_cents=pitch, device=_parse_device(device))
     _run_display(player, gui)
 
@@ -191,6 +196,8 @@ def play_along(audio_file, part, speed, pitch, device, gui):
     stems_dir = ensure_stems(audio_file)
     if not beats_exist(audio_file):
         click.echo("Detecting beats...")
-    ensure_beats(audio_file)
+    res = ensure_beats(audio_file)
+    if res is None:
+        click.echo("Couldn't detect beats. Continuing without click track and count-in.")
     player = Player(stems_dir, part, initial_mode="backing", initial_speed=speed / 100, initial_cents=pitch, device=_parse_device(device))
     _run_display(player, gui)

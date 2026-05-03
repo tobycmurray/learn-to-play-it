@@ -59,14 +59,14 @@ class TestPlayerCountInState:
 
     def test_count_in_loaded(self, player):
         assert player._count_in_track is not None
-        assert player._count_in_samples > 0
+        assert player._count_in_start < 0
 
     def test_count_in_enabled_by_default(self, player):
         assert player.count_in_enabled is True
 
     def test_start_pos_negative_when_enabled(self, player):
         assert player._start_pos < 0
-        assert player._start_pos == -player._count_in_samples
+        assert player._start_pos == player._count_in_start
 
     def test_start_pos_zero_when_disabled(self, player):
         player.count_in_enabled = False
@@ -93,7 +93,7 @@ class TestReadBlock:
         assert block.shape == (1024, CHANNELS)
 
     def test_negative_territory_shape(self, player):
-        block = player._read_block(-player._count_in_samples, 1024)
+        block = player._read_block(player._count_in_start, 1024)
         assert block.shape == (1024, CHANNELS)
 
     def test_straddling_zero_shape(self, player):
@@ -103,7 +103,7 @@ class TestReadBlock:
     def test_fully_negative_is_mostly_silent(self, player):
         """In deep negative territory (before count-in clicks), audio is near-silent."""
         player.count_in_enabled = False
-        block = player._read_block(-player._count_in_samples, 1024)
+        block = player._read_block(player._count_in_start, 1024)
         assert np.allclose(block, 0)
 
     def test_straddling_block_has_audio_in_second_half(self, player):
@@ -123,7 +123,7 @@ class TestReadBlock:
         mono = player._count_in_track[:, 0]
         first_nonzero = int(np.argmax(mono != 0))
         # Read a block that covers that click
-        pos = first_nonzero - player._count_in_samples
+        pos = first_nonzero + player._count_in_start
         block = player._read_block(pos, 1024)
         assert not np.allclose(block, 0)
 
@@ -131,7 +131,7 @@ class TestReadBlock:
         """With count-in disabled, negative territory should be silent."""
         player.count_in_enabled = False
         player.click_active = False
-        block = player._read_block(-player._count_in_samples, 1024)
+        block = player._read_block(player._count_in_start, 1024)
         assert np.allclose(block, 0)
 
     def test_positive_territory_includes_click_track(self, player):
@@ -154,7 +154,7 @@ class TestRestart:
         player.count_in_enabled = True
         player.pos_orig = 50000
         player.restart()
-        assert player.pos_orig == -player._count_in_samples
+        assert player.pos_orig == player._count_in_start
 
     def test_restart_without_count_in(self, player):
         player.count_in_enabled = False

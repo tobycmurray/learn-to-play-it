@@ -88,6 +88,7 @@ class SeparationWorker(QThread):
             self.finished.emit(str(stems_dir))
         except Exception as e:
             self.error.emit(str(e))
+            self.finished.emit(str(stems_dir))
         finally:
             sys.stderr = old_stderr
 
@@ -103,7 +104,9 @@ class BeatDetectionWorker(QThread):
     def run(self):
         try:
             from .beats import ensure_beats
-            ensure_beats(self.audio_file)
+            r  = ensure_beats(self.audio_file)
+            if r is None:
+                raise Exception("Failed to detect beats.")
             self.finished.emit()
         except Exception as e:
             self.error.emit(str(e))
@@ -426,8 +429,7 @@ class AppWindow(QMainWindow):
         if self._pipeline is None:
             return
         self._pipeline.cleanup()
-        QMessageBox.warning(self, "Beat Detection Failed", f"Could not detect beats:\n{error_msg}\n\nContinuing without click track.")
-        self._pipeline_start_player()
+        QMessageBox.warning(self, "Beat Detection Failed", f"Could not detect beats:\n{error_msg}\n\nContinuing without click track or count-in.")
 
     def _pipeline_start_player(self):
         args = self._pipeline.player_args

@@ -50,8 +50,8 @@ def compute_count_in(beats_data: dict, sr: int, channels: int) -> tuple[np.ndarr
     """Compute a count-in click track leading into the first downbeat.
 
     Uses BPM and time signature from the summary, plus the first downbeat position.
-    Returns (count_in_track, count_in_samples) or None if insufficient data.
-    Index mapping: array_idx = pos_orig + count_in_samples.
+    Returns (count_in_track, count_in_start) or None if insufficient data.
+    Index mapping: array_idx = pos_orig - count_in_start
     """
     downbeats = beats_data.get("downbeats", [])
     summary = beats_data.get("summary", {})
@@ -64,29 +64,33 @@ def compute_count_in(beats_data: dict, sr: int, channels: int) -> tuple[np.ndarr
     n_beats = int(time_sig.split("/")[0])
     beat_interval = 60.0 / bpm
     first_downbeat = downbeats[0]
-
     count_in_times = [first_downbeat - (n_beats - i) * beat_interval for i in range(n_beats)]
 
     downbeat_click, beat_click, click_samples = _make_clicks(sr)
 
     warmup_samples = int(COUNTIN_WARMUP * sr)
-    count_in_samples = int(abs(count_in_times[0]) * sr) + warmup_samples
+    last_click_end = count_in_times[-1] + CLICK_DURATION
+    count_in_samples = int((first_downbeat - count_in_times[0]) * sr)
+
+    ci_start_secs = count_in_times[0] - COUNTIN_WARMUP
+
     if count_in_samples <= 0:
         return None
 
-    last_click_end = count_in_times[-1] + CLICK_DURATION
-    track_len = count_in_samples + int(last_click_end * sr)
+    track_len = count_in_samples + warmup_samples
     track = np.zeros((track_len, channels), dtype=np.float32)
 
+    start_time = int(sr * ci_start_secs)
+
     for i, ct in enumerate(count_in_times):
-        array_idx = int(ct * sr) + count_in_samples
+        array_idx = int(ct * sr) - start_time
         if array_idx < 0 or array_idx + click_samples > track_len:
             continue
         click = downbeat_click if i == 0 else beat_click
         for ch in range(channels):
             track[array_idx:array_idx + click_samples, ch] += click
 
-    return track, count_in_samples
+    return track, start_time
 
 
 def render_click_track(beats_data: dict, song_len: int, sr: int, channels: int) -> np.ndarray:
@@ -123,7 +127,10 @@ def detect_beats(audio_file: str, from_stem: str | None = None) -> dict:
         input_path = audio_file
 
     model = File2Beats(checkpoint_path="final0", device="cpu")
-    beat_times, downbeat_times = model(input_path)
+    try:
+        beat_times, downbeat_times = model(input_path)
+    except Exception as e:
+        return None
 
     beats = beat_times.tolist()
     downbeats = downbeat_times.tolist()
