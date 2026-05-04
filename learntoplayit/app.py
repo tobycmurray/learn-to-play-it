@@ -282,6 +282,11 @@ class AppWindow(QMainWindow):
         open_action.triggered.connect(self._open_file)
         file_menu.addAction(open_action)
 
+        open_clean_action = QAction("Open (force separation)…", self)
+        open_clean_action.setShortcut(QKeySequence(Qt.SHIFT | Qt.CTRL | Qt.Key_O))
+        open_clean_action.triggered.connect(lambda: self._open_file(clean_stems=True))
+        file_menu.addAction(open_clean_action)
+
         file_menu.addSeparator()
 
         quit_action = QAction("&Quit", self)
@@ -318,7 +323,7 @@ class AppWindow(QMainWindow):
         if self.player is not None:
             fn(self.player)
 
-    def _open_file(self):
+    def _open_file(self, clean_stems=False):
         path, _ = QFileDialog.getOpenFileName(
             self, "Open Audio File", "",
             "Audio Files (*.mp3 *.wav *.flac *.ogg *.m4a *.aac);;All Files (*)",
@@ -335,6 +340,14 @@ class AppWindow(QMainWindow):
                 "  apt install ffmpeg   (Linux)",
             )
             return
+
+        if clean_stems:
+            from .separate import get_stems_dir
+
+            stems_dir = get_stems_dir(path)
+            if stems_dir.exists():
+                shutil.rmtree(stems_dir)
+
 
         self._start_pipeline(path)
 
