@@ -124,7 +124,6 @@ class SetupDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Setup")
         layout = QVBoxLayout(self)
-        print(stems)
         self.stems = stems
 
         layout.addWidget(QLabel("Part"))

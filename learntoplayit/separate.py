@@ -65,7 +65,6 @@ def separate_stems(audio_file: str) -> Path:
         # filter out anything that is basically silence
         m = np.abs(audio).max()
         if m >= 0.1:
-            print(f"keeping stem {stem}, max: {m}")
             dst = stems_dir / f"{stem}.wav"
             shutil.move(str(src), str(dst))
 
