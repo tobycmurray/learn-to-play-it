@@ -179,7 +179,7 @@ def clean(audio_file):
 
 @main.command("play-along")
 @click.argument("audio_file", type=click.Path(exists=True))
-@click.argument("part", type=click.Choice(["vocals", "drums", "bass", "guitar", "piano", "other"]))
+@click.argument("part", type=click.Choice(STEM_NAMES))
 @click.option("--speed", type=int, default=100, help="Initial speed as percentage (default: 100)")
 @click.option("--pitch", type=int, default=0, help="Initial pitch shift in cents (default: 0)")
 @click.option("--device", type=str, default=None, help="Audio output device (name or index)")
