@@ -11,6 +11,7 @@ Scripts for building, signing, notarizing, and packaging the macOS distribution.
 | `make_dmg.sh [--skip-notarize]` | Build `dist/Learn-To-Play-It-{VERSION}.dmg`, then notarize + staple it |
 | `release.sh [--clean]` | Runs the three build scripts above end-to-end |
 | `publish_release.sh` | Tag the commit, push the tag, attach the dmg to a GitHub release |
+| `patch_info_plist.py` | Called by `build_app.sh`. Sets version + `LSMinimumSystemVersion` derived from `pyproject.toml` and the bundled binaries. |
 
 ## Workflows
 
@@ -132,6 +133,19 @@ A `shutil.which("ffmpeg")` check still exists in `app.py` and `cli.py`, but it
 runs only when **not frozen** (i.e. dev mode running from source). In dev mode,
 torchcodec needs the libav* from `/opt/homebrew/opt/ffmpeg/lib/`, and the check
 gives a friendly "install ffmpeg with brew" message if it's missing.
+
+## Minimum macOS version
+
+`build_app.sh` runs `patch_info_plist.py` after PyInstaller, which scans every
+bundled Mach-O binary for its `LC_BUILD_VERSION` `minos` and sets the .app's
+`LSMinimumSystemVersion` to the highest one found. So the declared minimum
+always reflects the most-restrictive bundled library — if you upgrade
+PyInstaller, Python, PySide6, torch, etc. and the new versions need a newer
+macOS, the .app will declare it automatically. No drift, no risk of shipping a
+.app whose Info.plist understates its true requirements.
+
+The script also sets `CFBundleShortVersionString` and `CFBundleVersion` from
+`pyproject.toml`, again to keep things consistent.
 
 ## DMG background image
 

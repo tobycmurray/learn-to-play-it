@@ -148,8 +148,9 @@ app = BUNDLE(
     info_plist={
         "CFBundleName": APP_NAME,
         "CFBundleDisplayName": APP_NAME,
-        "CFBundleShortVersionString": "0.1.0",
-        "CFBundleVersion": "0.1.0",
+        # CFBundleShortVersionString, CFBundleVersion, and LSMinimumSystemVersion
+        # are set by packaging/macos/patch_info_plist.py post-build, so they
+        # always match pyproject.toml and the actually-bundled binaries.
         "NSHighResolutionCapable": True,
         "NSMicrophoneUsageDescription": (
             "Learn To Play It uses audio input/output features while helping you "

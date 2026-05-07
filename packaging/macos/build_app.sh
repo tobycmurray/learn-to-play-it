@@ -22,4 +22,8 @@ python -m pip install pyinstaller
 
 python -m PyInstaller --clean --noconfirm packaging/macos/learn-to-play-it.spec
 
+# Set CFBundle*Version (from pyproject.toml) and LSMinimumSystemVersion (from
+# the highest minos across all bundled Mach-O binaries). Must run before signing.
+python packaging/macos/patch_info_plist.py
+
 printf '\nBuilt: dist/Learn To Play It.app\n'
