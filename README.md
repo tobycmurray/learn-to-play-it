@@ -14,6 +14,16 @@ A tool that helps musicians learn parts from recorded songs by:
 3. **Practicing** an isolated part slowed down, with optional pitch shifting and section looping, progressively speeding up as you learn it, finally enabling
 4. **Playing along** with the full mix minus your instrument — like karaoke, but for any part
 
+## Download (macOS)
+
+**Apple Silicon Mac running macOS 26.0 (Tahoe) or later**: download the latest `.dmg` from the [releases page](https://github.com/tobycmurray/learn-to-play-it/releases/latest), open it, and drag **Learn To Play It** into your Applications folder. Then launch from Spotlight, Launchpad, or the Applications folder.
+
+The app is signed and notarized, so it launches without Gatekeeper warnings. No need to install FFmpeg, Python, or anything else — everything is bundled.
+
+On first launch, the app downloads the AI models for stem separation and beat detection (~200 MB total), which requires an internet connection. Subsequent launches use the cached models.
+
+For other platforms, older macOS versions, or to use the command-line interface, follow the source instructions below.
+
 ## Prerequisites
 
 - Python 3.10+
@@ -260,4 +270,3 @@ ltpi practice song.mp3 guitar
 
 - MIDI / guitar tab transcription from isolated stems
 - Adjustable count-in beat count
-- Standalone macOS app bundle
