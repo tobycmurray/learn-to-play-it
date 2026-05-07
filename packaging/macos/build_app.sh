@@ -26,4 +26,8 @@ python -m PyInstaller --clean --noconfirm packaging/macos/learn-to-play-it.spec
 # the highest minos across all bundled Mach-O binaries). Must run before signing.
 python packaging/macos/patch_info_plist.py
 
+# Fail the build if any @rpath/ reference inside the bundle resolves to a
+# missing file — that would crash the app on every user's machine.
+python packaging/macos/verify_bundle.py
+
 printf '\nBuilt: dist/Learn To Play It.app\n'

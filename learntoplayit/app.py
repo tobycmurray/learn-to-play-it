@@ -82,13 +82,16 @@ class SeparationWorker(QThread):
     def run(self):
         old_stderr = sys.stderr
         sys.stderr = _StderrCapture(self.progress, old_stderr)
+        # Catch BaseException so demucs's sys.exit(1) on load failure becomes a
+        # signalled error rather than terminating the interpreter from this thread,
+        # which would trigger Qt cleanup on the wrong thread and crash AppKit.
         try:
             from .separate import ensure_stems
             stems_dir = ensure_stems(self.audio_file)
             self.finished.emit(str(stems_dir))
-        except Exception as e:
-            self.error.emit(str(e))
-            self.finished.emit(str(stems_dir))
+        except BaseException as e:
+            self.error.emit(f"{type(e).__name__}: {e}")
+            self.finished.emit("")
         finally:
             sys.stderr = old_stderr
 
@@ -108,8 +111,8 @@ class BeatDetectionWorker(QThread):
             if r is None:
                 raise Exception("Failed to detect beats.")
             self.finished.emit()
-        except Exception as e:
-            self.error.emit(str(e))
+        except BaseException as e:
+            self.error.emit(f"{type(e).__name__}: {e}")
 
 
 PRESETS = {

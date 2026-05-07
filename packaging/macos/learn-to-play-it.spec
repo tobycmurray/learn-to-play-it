@@ -29,13 +29,65 @@ binaries = []
 hiddenimports = []
 
 # torchcodec links against libav* (libavutil, libavformat, libavcodec, libswresample, ...)
-# from Homebrew's ffmpeg installation. PyInstaller picks these up automatically via @rpath
-# analysis on torchcodec's dylibs. ffmpeg must be installed via Homebrew at build time so
-# those dylibs are available to be bundled, but the ffmpeg/ffprobe binaries themselves are
-# not used at runtime.
+# from Homebrew's ffmpeg installation. PyInstaller's automatic dependency analysis catches
+# the libav* libraries and most of their direct deps, but it MISSES some transitive native
+# deps (e.g. libx265, which is referenced via @rpath but not picked up automatically). To
+# avoid shipping a bundle with unresolved @rpath references, we walk otool -L recursively
+# from ffmpeg's lib directory and bundle every Homebrew-rooted dylib in the closure.
 import shutil as _shutil
+import subprocess as _subprocess
+from pathlib import Path as _Path
+
 if not _shutil.which("ffmpeg"):
     raise FileNotFoundError("ffmpeg not found on PATH; install it (brew install ffmpeg) before building")
+
+
+def _collect_homebrew_dep_closure(seed_paths):
+    """Walk otool -L recursively from seed_paths. Return resolved absolute paths
+    of all transitive deps under /opt/homebrew or /usr/local. System libs (in
+    /usr/lib, /System) are excluded — macOS guarantees those at runtime.
+    """
+    seen_real = set()
+    queue = list(seed_paths)
+    while queue:
+        ref = queue.pop()
+        if not ref.startswith(("/opt/homebrew/", "/usr/local/")):
+            continue
+        path = _Path(ref)
+        if not path.exists():
+            continue
+        real = path.resolve()
+        if real in seen_real:
+            continue
+        seen_real.add(real)
+        try:
+            out = _subprocess.check_output(
+                ["otool", "-L", str(real)],
+                text=True, stderr=_subprocess.DEVNULL,
+            )
+        except _subprocess.CalledProcessError:
+            continue
+        for line in out.splitlines()[1:]:
+            dep = line.strip().split(" ", 1)[0]
+            if dep.startswith(("/opt/homebrew/", "/usr/local/")):
+                queue.append(dep)
+    return sorted(seen_real)
+
+
+_ffmpeg_lib_dir = _Path(_shutil.which("ffmpeg")).resolve().parent.parent / "lib"
+_seed = (
+    list(_ffmpeg_lib_dir.glob("libav*.dylib"))
+    + list(_ffmpeg_lib_dir.glob("libsw*.dylib"))
+)
+if not _seed:
+    raise RuntimeError(
+        f"No libav*/libsw* dylibs found in {_ffmpeg_lib_dir}. "
+        "Try `brew reinstall ffmpeg`."
+    )
+_native_deps = _collect_homebrew_dep_closure([str(p) for p in _seed])
+print(f"[spec] Bundling {len(_native_deps)} Homebrew native deps "
+      f"(transitive closure from {_ffmpeg_lib_dir.name}/lib*av*/lib*sw*)")
+binaries += [(str(p), ".") for p in _native_deps]
 
 # Your app/package resources.
 resource_candidates = [

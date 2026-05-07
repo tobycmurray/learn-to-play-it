@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "learn-to-play-it"
-version = "0.1.1"
+version = "0.1.2"
 description = "Learn to play musical parts from recorded songs"
 license = "GPL-3.0-or-later"
 requires-python = ">=3.10"
@@ -17,6 +17,10 @@ dependencies = [
     "numpy",
     "click",
     "beat-this",
+    # certifi provides a CA bundle for HTTPS verification in the frozen .app.
+    # The bundled Python interpreter can't access macOS Keychain trust roots,
+    # so torch.hub model downloads fail without it. Harmless from source.
+    "certifi",
 ]
 
 [project.optional-dependencies]

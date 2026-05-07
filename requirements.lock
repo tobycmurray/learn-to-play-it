@@ -8,6 +8,8 @@ antlr4-python3-runtime==4.9.3
     # via omegaconf
 beat-this==1.1.0
     # via learn-to-play-it (pyproject.toml)
+certifi==2026.4.22
+    # via learn-to-play-it (pyproject.toml)
 cffi==2.0.0
     # via
     #   sounddevice

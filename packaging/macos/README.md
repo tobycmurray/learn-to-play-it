@@ -12,6 +12,7 @@ Scripts for building, signing, notarizing, and packaging the macOS distribution.
 | `release.sh [--clean]` | Runs the three build scripts above end-to-end |
 | `publish_release.sh` | Tag the commit, push the tag, attach the dmg to a GitHub release |
 | `patch_info_plist.py` | Called by `build_app.sh`. Sets version + `LSMinimumSystemVersion` derived from `pyproject.toml` and the bundled binaries. |
+| `verify_bundle.py` | Called by `build_app.sh`. Fails the build if any `@rpath` reference inside the bundle points at a missing file. |
 
 ## Workflows
 
@@ -113,6 +114,25 @@ op, adding a plugin model, microphone access), create
 `packaging/macos/entitlements.plist` with the needed keys. `sign_and_notarize.sh`
 auto-detects the file and passes it to codesign. To go back to no entitlements,
 delete the file.
+
+## Bundling ffmpeg's transitive native deps
+
+`torchcodec` links against ffmpeg's libav* shared libraries (libavutil,
+libavformat, libavcodec, libswresample, ...). Those in turn link against codec
+libraries like libx264, libx265, libvpx, libaom, libdav1d, etc. PyInstaller's
+automatic dependency analysis catches the libav* libraries and most of their
+direct deps, but historically misses some transitive ones — for example
+`libx265` is referenced via `@rpath/libx265.NNN.dylib` and was silently omitted
+from earlier builds, producing an .app that crashed on any user's machine.
+
+The spec works around this by walking `otool -L` recursively from the
+Homebrew-installed `libav*`/`libsw*` and bundling every `/opt/homebrew/...`
+dylib in the closure. `verify_bundle.py` then fails the build if any
+`@rpath/<name>` reference inside the bundle still points at a missing file.
+
+If you ever upgrade Homebrew packages and ffmpeg's link set changes, the spec
+auto-discovers the new closure on the next build. No manual list to keep in
+sync.
 
 ## Why we don't bundle the ffmpeg binary
 
