@@ -32,9 +32,13 @@ echo "Building, notarizing, and stapling DMG"
 echo "============================================================"
 packaging/macos/make_dmg.sh
 
+VERSION=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')
+
 echo
 echo "============================================================"
-echo "Release artifacts ready:"
+echo "Release artifacts ready (version $VERSION):"
 echo "  dist/Learn To Play It.app"
-echo "  dist/Learn-To-Play-It.dmg"
+echo "  dist/Learn-To-Play-It-${VERSION}.dmg"
+echo
+echo "Next: packaging/macos/publish_release.sh   (tag + GitHub release)"
 echo "============================================================"

@@ -8,16 +8,32 @@ Scripts for building, signing, notarizing, and packaging the macOS distribution.
 | --- | --- |
 | `build_app.sh [--clean]` | PyInstaller → unsigned `dist/Learn To Play It.app` |
 | `sign_and_notarize.sh` | Codesign with hardened runtime, submit to Apple notary, staple |
-| `make_dmg.sh [--skip-notarize]` | Build `dist/Learn-To-Play-It.dmg`, then notarize + staple it |
-| `release.sh [--clean]` | Runs all three above end-to-end |
+| `make_dmg.sh [--skip-notarize]` | Build `dist/Learn-To-Play-It-{VERSION}.dmg`, then notarize + staple it |
+| `release.sh [--clean]` | Runs the three build scripts above end-to-end |
+| `publish_release.sh` | Tag the commit, push the tag, attach the dmg to a GitHub release |
 
 ## Workflows
 
 **Cut a release** (most common):
 ```
+# 1. Decide what version this release is. Edit pyproject.toml if you need to bump it.
+
+# 2. Build, sign, notarize, dmg.
 packaging/macos/release.sh --clean
+
+# 3. Tag the commit and create the GitHub release.
+packaging/macos/publish_release.sh
+
+# 4. Bump pyproject.toml to the next planned version (e.g. 0.2.0 → 0.3.0), commit, push.
 ```
-Produces a signed, notarized, stapled `.app` and `.dmg`. Distribute the `.dmg`.
+
+`publish_release.sh` refuses to run unless: working tree is clean, current branch
+is `main`, local main matches `origin/main`, the tag for the current
+`pyproject.toml` version doesn't already exist, and the expected dmg artifact
+is on disk. So if you forgot a step, it'll tell you.
+
+The version number lives **only** in `pyproject.toml`. `make_dmg.sh` and
+`publish_release.sh` both read it from there. Don't try to track it elsewhere.
 
 **Iterate on the .app build** without paying for notarization each time:
 ```

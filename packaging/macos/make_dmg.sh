@@ -13,8 +13,10 @@ if [[ "${1:-}" == "--skip-notarize" ]]; then
     SKIP_NOTARIZE=1
 fi
 
+VERSION=$(python3 -c 'import tomllib; print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')
+
 NOTARY_PROFILE="${NOTARY_PROFILE:-ltpi-notary}"
-DMG="dist/Learn-To-Play-It.dmg"
+DMG="dist/Learn-To-Play-It-${VERSION}.dmg"
 APP="dist/Learn To Play It.app"
 BG="packaging/macos/dmg-background.png"
 
@@ -29,7 +31,7 @@ if [[ ! -d "$APP" ]]; then
     exit 1
 fi
 
-rm -f "$DMG"
+rm -f "dist/Learn-To-Play-It-"*.dmg "$DMG"
 
 ARGS=(
   --volname "Learn To Play It"
