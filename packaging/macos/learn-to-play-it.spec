@@ -28,6 +28,10 @@ datas = []
 binaries = []
 hiddenimports = []
 
+# Ship the project's own LICENSE in the bundle so the GPL-2 license terms are
+# discoverable from the .app itself, not only from the GitHub repo.
+datas += [(str(PROJECT_ROOT / "LICENSE"), ".")]
+
 # torchcodec links against libav* (libavutil, libavformat, libavcodec, libswresample, ...)
 # from Homebrew's ffmpeg installation. PyInstaller's automatic dependency analysis catches
 # the libav* libraries and most of their direct deps, but it MISSES some transitive native
