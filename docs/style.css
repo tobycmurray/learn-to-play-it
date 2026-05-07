@@ -51,8 +51,9 @@ a:hover {
   width: 160px;
   height: 160px;
   margin-bottom: 24px;
-  border-radius: 28px;
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.08);
+  /* No CSS border-radius or box-shadow: the icon ships its own rounded shape
+     and any rectangular shadow/clip on the <img> would trace the image's
+     transparent corner margins, creating a visible halo. */
 }
 
 h1 {
@@ -98,9 +99,9 @@ h1 {
 .screenshot img {
   width: 100%;
   height: auto;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  /* macOS window screenshots ship with their own drop shadow inside transparent
+     margins, so we don't add a CSS border or box-shadow — they would trace a
+     rectangle around the whole image including the shadow halo. */
 }
 
 .features {
@@ -164,12 +165,6 @@ footer p {
     --accent: #60a5fa;
     --accent-dark: #3b82f6;
     --border: #333;
-  }
-  .logo {
-    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
-  }
-  .screenshot img {
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   }
   .button {
     color: #0a0a0a;
