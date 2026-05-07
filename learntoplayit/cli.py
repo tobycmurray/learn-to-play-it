@@ -1,19 +1,23 @@
+import sys
 import shutil
 
 import click
 
 from .separate import STEM_NAMES
 
-def _check_prerequisites():
-    missing = []
-    for name, hint in [
-        ("ffmpeg", "brew install ffmpeg (macOS) / apt install ffmpeg (Linux)"),
-    ]:
-        if shutil.which(name) is None:
-            missing.append(f"  - '{name}': {hint}")
-    if missing:
+
+def _check_dev_prerequisites():
+    """When running from source, ffmpeg is needed for torchcodec's libav*.
+
+    In a frozen bundle these are shipped inside the .app, so the check is skipped.
+    """
+    if getattr(sys, "frozen", False):
+        return
+    if shutil.which("ffmpeg") is None:
         raise click.ClickException(
-            "Missing required tools:\n" + "\n".join(missing)
+            "ffmpeg is required when running from source. Install it with:\n"
+            "  brew install ffmpeg  (macOS)\n"
+            "  apt install ffmpeg   (Linux)"
         )
 
 
@@ -59,7 +63,7 @@ def _validate_speed_pitch(speed, pitch):
 @click.pass_context
 def main(ctx, stems_dir):
     """Learn to play musical parts from recorded songs."""
-    _check_prerequisites()
+    _check_dev_prerequisites()
     if stems_dir is not None:
         from .separate import set_stems_root
         set_stems_root(stems_dir)

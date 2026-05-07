@@ -330,10 +330,10 @@ class AppWindow(QMainWindow):
         if not path:
             return
 
-        if shutil.which("ffmpeg") is None:
+        if not getattr(sys, "frozen", False) and shutil.which("ffmpeg") is None:
             QMessageBox.critical(
                 self, "Missing Dependency",
-                "ffmpeg is required for stem separation.\n\n"
+                "ffmpeg is required when running from source.\n\n"
                 "Install it with:\n"
                 "  brew install ffmpeg  (macOS)\n"
                 "  apt install ffmpeg   (Linux)",

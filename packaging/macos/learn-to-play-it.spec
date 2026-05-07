@@ -28,12 +28,14 @@ datas = []
 binaries = []
 hiddenimports = []
 
+# torchcodec links against libav* (libavutil, libavformat, libavcodec, libswresample, ...)
+# from Homebrew's ffmpeg installation. PyInstaller picks these up automatically via @rpath
+# analysis on torchcodec's dylibs. ffmpeg must be installed via Homebrew at build time so
+# those dylibs are available to be bundled, but the ffmpeg/ffprobe binaries themselves are
+# not used at runtime.
 import shutil as _shutil
-_ffmpeg = _shutil.which("ffmpeg")
-if _ffmpeg:
-    binaries += [(_ffmpeg, "bin")]
-else:
-    raise FileNotFoundError("ffmpeg not found on PATH; install it before building")
+if not _shutil.which("ffmpeg"):
+    raise FileNotFoundError("ffmpeg not found on PATH; install it (brew install ffmpeg) before building")
 
 # Your app/package resources.
 resource_candidates = [
