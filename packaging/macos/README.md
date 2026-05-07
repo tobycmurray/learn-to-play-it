@@ -115,6 +115,54 @@ op, adding a plugin model, microphone access), create
 auto-detects the file and passes it to codesign. To go back to no entitlements,
 delete the file.
 
+## Pre-release test procedure
+
+Before publishing, verify the .app is genuinely self-contained — i.e. it doesn't
+silently rely on anything from your dev machine that won't exist on a user's.
+The single most decisive test simulates a clean Mac without Homebrew or any
+cached model weights:
+
+```
+# 1. Move Homebrew out of the way. Your shell PATH will lose python3, gh,
+#    ffmpeg, etc. — that's the point. Use absolute paths (/usr/bin/open) for
+#    anything you need to invoke.
+sudo mv /opt/homebrew /opt/homebrew.disabled
+
+# 2. Delete the torch hub cache so the app has to download model weights fresh
+#    on first launch. This exercises the HTTPS / certificate code path.
+rm -rf ~/.cache/torch/hub
+
+# 3. Open the dmg, drag .app to /Applications (if not already), and launch:
+open /Applications/"Learn To Play It.app"
+
+# 4. Inside the app:
+#    - Open an audio file you have to hand
+#    - Trigger stem separation (downloads demucs model on first run)
+#    - Trigger beat detection (downloads beat_this model on first run)
+#    Both should succeed end-to-end with progress dialogs visible.
+
+# 5. (Optional but good) Disable network — turn off Wi-Fi — and verify that
+#    a fresh model download fails with a clean error dialog rather than a
+#    silent crash.
+
+# 6. Restore Homebrew. DON'T FORGET.
+sudo mv /opt/homebrew.disabled /opt/homebrew
+```
+
+If the .app launches and runs end-to-end with `/opt/homebrew` gone and the
+torch cache empty, it has no hidden dev-machine dependencies. The `verify_bundle.py`
+build-time check should catch most issues earlier, but this is the only test
+that catches "library X was findable on my machine but won't be on a user's"
+issues that don't show up as @rpath refs.
+
+A less invasive alternative is to do the same test from a freshly-created
+Standard user account on your Mac (System Settings → Users & Groups → Add
+User). That account has no shell config, no Homebrew on PATH, and Launch
+Services launches apps with the launchd PATH. The downside: more setup, and
+`/opt/homebrew` still exists on disk so any unrewritten absolute path
+references in the bundle would still resolve (the `mv` test catches those
+explicitly).
+
 ## Bundling ffmpeg's transitive native deps
 
 `torchcodec` links against ffmpeg's libav* shared libraries (libavutil,
