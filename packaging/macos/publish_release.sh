@@ -110,6 +110,24 @@ else
     gh release create "$TAG" "$DMG" --title "$TAG"
 fi
 
+echo "==> Updating website (docs/index.html) to point at $TAG"
+WEBSITE="docs/index.html"
+if [[ -f "$WEBSITE" ]]; then
+    sed -i '' \
+        -e "s|releases/download/v[0-9.]*/Learn-To-Play-It-[0-9.]*\.dmg|releases/download/${TAG}/Learn-To-Play-It-${VERSION}.dmg|" \
+        -e "s|<span id=\"version\">Version [0-9.]*</span>|<span id=\"version\">Version ${VERSION}</span>|" \
+        "$WEBSITE"
+    if git diff --quiet "$WEBSITE"; then
+        echo "    (no change — website was already at $VERSION)"
+    else
+        git add "$WEBSITE"
+        git commit -m "bump website download link to $TAG"
+        git push
+    fi
+else
+    echo "    (no $WEBSITE found; skipping)"
+fi
+
 echo
 echo "Done. Don't forget to bump pyproject.toml version for the next release cycle."
 gh release view "$TAG" --json url --jq .url
