@@ -5,6 +5,7 @@
 # Learn To Play It (ltpi)
 
 [![CI](https://github.com/tobycmurray/learn-to-play-it/actions/workflows/ci.yml/badge.svg)](https://github.com/tobycmurray/learn-to-play-it/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/tobycmurray/learn-to-play-it)](https://github.com/tobycmurray/learn-to-play-it/releases/latest)
 
 A tool that helps musicians learn parts from recorded songs by:
 
