@@ -1,3 +1,4 @@
+import math
 import threading
 from dataclasses import dataclass
 
@@ -73,25 +74,52 @@ class WaveformData:
     """A snapshot of the waveform viewport.
 
     The whole song's amplitude envelope is precomputed as a fixed grid of
-    NUDGE_SECONDS-wide bins. The viewport slides smoothly across that grid:
+    NUDGE_SECONDS-wide bins. The viewport slides smoothly across that grid;
     `viewport_start_bin` is the fractional global bin index of the viewport's
-    left edge, and `bin_offset` (== viewport_start_bin - floor(viewport_start_bin))
-    says how far through bin 0 of `bins` the viewport's left edge sits.
+    left edge.
 
-    `bins` has length num_bins + 1 so the GUI can render a partial bin at
-    each edge as the viewport offset changes.
+    Coordinate systems used by callers:
+      - global bin index: integer 0..total_bins. Indexes into the song's
+        canonical bin grid. Fractional values represent positions between bins.
+      - viewport column: float 0..num_bins. Position within the visible viewport.
+        Equal to (global_bin - viewport_start_bin).
+      - pixel x: 0..viewport_pixel_width. Screen position. Equal to
+        (viewport_col * viewport_pixel_width / num_bins).
 
-    Column positions for `cursor_col` and the loop markers are fractional
-    (sub-bin precision). The GUI uses them as-is; the TUI rounds.
+    `bins` has length num_bins + 1 so the renderer can show a partial bin at
+    the right edge as the viewport offset changes. Use `num_bins` to discover
+    the logical viewport width.
     """
     bins: np.ndarray
-    bin_offset: float
-    cursor_col: float
+    viewport_start_bin: float
     loop_start_col: float | None
     loop_end_col: float | None
     loop_active: bool
-    viewport_start_bin: float
-    total_bins: int  # total bins in the song (defines the seekable range)
+    total_bins: int
+
+    @property
+    def num_bins(self) -> int:
+        """Logical viewport width in bins (= len(bins) - 1)."""
+        return len(self.bins) - 1
+
+    @property
+    def bin_offset(self) -> float:
+        """How far through bins[0] the viewport's left edge sits, in [0, 1)."""
+        return self.viewport_start_bin - math.floor(self.viewport_start_bin)
+
+    @property
+    def cursor_col(self) -> float:
+        """Cursor's column position in the viewport — always the centre."""
+        return self.num_bins / 2
+
+    def x_to_global_bin(self, x_px: float, viewport_pixel_width: int) -> int:
+        """Map a pixel x within the viewport to a global bin index."""
+        bar_w = viewport_pixel_width / self.num_bins
+        return math.floor(x_px / bar_w + self.viewport_start_bin)
+
+    def global_bin_to_col(self, global_bin: float) -> float:
+        """Map a global bin index to a (fractional) viewport column."""
+        return global_bin - self.viewport_start_bin
 
 
 class Player:
@@ -341,11 +369,10 @@ class Player:
         # slides smoothly across the song's canonical bin grid as playback advances.
         cursor_bin = self._playback_pos / bin_samples
         viewport_start_bin = cursor_bin - num_bins / 2
-        start_int = int(np.floor(viewport_start_bin))
-        bin_offset = float(viewport_start_bin - start_int)
+        start_int = math.floor(viewport_start_bin)
 
-        # Slice (num_bins + 1) bins from the cache — one extra so the GUI can
-        # render the partial bin at the right edge. Pad with zeros where the
+        # Slice (num_bins + 1) bins from the cache — one extra so the renderer
+        # can show the partial bin at the right edge. Zero-pad where the
         # viewport extends outside the song.
         bins = np.zeros(num_bins + 1, dtype=np.float32)
         src_start = max(0, start_int)
@@ -369,12 +396,10 @@ class Player:
 
         return WaveformData(
             bins=bins,
-            bin_offset=bin_offset,
-            cursor_col=num_bins / 2,
+            viewport_start_bin=float(viewport_start_bin),
             loop_start_col=loop_start_col,
             loop_end_col=loop_end_col,
             loop_active=self.loop_active,
-            viewport_start_bin=float(viewport_start_bin),
             total_bins=total_bins,
         )
 

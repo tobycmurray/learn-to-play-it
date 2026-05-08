@@ -111,15 +111,16 @@ class TerminalDisplay:
         return rows
 
     @staticmethod
-    def _marker_line(waveform_data, width):
+    def _marker_line(wd):
         # Column positions are fractional (sub-bin precision); round for the
         # character grid.
+        width = wd.num_bins
         markers = [" "] * width
-        markers[min(width - 1, int(round(waveform_data.cursor_col)))] = "↑"
-        if waveform_data.loop_start_col is not None:
-            markers[min(width - 1, int(round(waveform_data.loop_start_col)))] = "["
-        if waveform_data.loop_end_col is not None:
-            markers[min(width - 1, int(round(waveform_data.loop_end_col)))] = "]"
+        markers[min(width - 1, int(round(wd.cursor_col)))] = "↑"
+        if wd.loop_start_col is not None:
+            markers[min(width - 1, int(round(wd.loop_start_col)))] = "["
+        if wd.loop_end_col is not None:
+            markers[min(width - 1, int(round(wd.loop_end_col)))] = "]"
         return "  " + "".join(markers)
 
     def _print_status(self):
@@ -132,11 +133,11 @@ class TerminalDisplay:
 
         if show_waveform and waveform_width >= 10:
             wd = p.waveform_bins(waveform_width)
-            # waveform_bins returns waveform_width + 1 bins so the GUI can
-            # render a partial bin at the right edge. The TUI is character-grid
-            # so we just use the first waveform_width bins.
-            rows = self._bins_to_rows(wd.bins[:waveform_width])
-            markers = self._marker_line(wd, waveform_width)
+            # wd.bins has length wd.num_bins + 1 (the extra is for the GUI's
+            # partial-bin-at-right-edge rendering). Drop it for the TUI's
+            # character grid.
+            rows = self._bins_to_rows(wd.bins[:wd.num_bins])
+            markers = self._marker_line(wd)
             body = [f"  {row}"[:term_width] for row in rows] + [markers[:term_width]]
         else:
             if show_waveform:

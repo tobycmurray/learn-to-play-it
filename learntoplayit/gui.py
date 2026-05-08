@@ -1,4 +1,3 @@
-import math
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QTimer, QSize
@@ -129,17 +128,10 @@ class WaveformWidget(QWidget):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setCursor(Qt.PointingHandCursor)
         self.setMouseTracking(True)
-        self._latest_wd = None  # cached most-recent WaveformData, used by click
-        # Mouse pixel x while hovering over the widget, or None when the cursor
-        # is elsewhere. We resolve this to a global bin in paintEvent so the
+        # Mouse pixel x while hovering over the widget, or None when the
+        # cursor is elsewhere. Resolved to a global bin in paintEvent so the
         # hover line tracks the mouse (not the song content) as playback scrolls.
         self._hover_mouse_x = None
-
-    def _x_to_global_bin(self, x_px, wd):
-        """Map a pixel x within the widget to a global bin index, given a
-        WaveformData (for the current viewport)."""
-        bar_w = self.width() / WAVEFORM_BINS
-        return math.floor(x_px / bar_w + wd.viewport_start_bin)
 
     def mouseMoveEvent(self, event):
         new_x = event.position().x()
@@ -155,10 +147,11 @@ class WaveformWidget(QWidget):
     def mousePressEvent(self, event):
         if self.player is None or event.button() != Qt.LeftButton:
             return super().mousePressEvent(event)
-        if self._latest_wd is None or self.width() < 10:
+        if self.width() < 10:
             return
-        target_bin = self._x_to_global_bin(event.position().x(), self._latest_wd)
-        if not (0 <= target_bin < self._latest_wd.total_bins):
+        wd = self.player.waveform_bins(WAVEFORM_BINS)
+        target_bin = wd.x_to_global_bin(event.position().x(), self.width())
+        if not (0 <= target_bin < wd.total_bins):
             return
         target_seconds = target_bin * NUDGE_SECONDS
         delta = target_seconds - self.player.playback_position
@@ -181,12 +174,11 @@ class WaveformWidget(QWidget):
             return
 
         wd = self.player.waveform_bins(WAVEFORM_BINS)
-        self._latest_wd = wd
-        bar_w = w / WAVEFORM_BINS
+        bar_w = w / wd.num_bins
 
         # Each bin in wd.bins[i] sits at visual column (i - bin_offset). As
         # playback advances, bin_offset increases smoothly from 0 to 1, then
-        # wraps when start_int advances — so the bins flow under the cursor.
+        # wraps as the viewport's left edge crosses a bin boundary.
         def bin_left_x(i):
             return int((i - wd.bin_offset) * bar_w)
 
@@ -223,17 +215,15 @@ class WaveformWidget(QWidget):
             painter.drawLine(le_x, top, le_x - LOOP_SERIF, top)
             painter.drawLine(le_x, bot, le_x - LOOP_SERIF, bot)
 
-        # Hover indicator: stays anchored to the mouse position rather than to
-        # the song content, and resolves to whichever bin the mouse currently
-        # sits over. Only drawn when that bin is within the song's seekable
-        # range — i.e. not over silence padding at the song's start or end.
+        # Hover indicator: anchored to the mouse position rather than the song
+        # content, so it stays under the cursor as playback scrolls past.
+        # Only drawn when the bin under the mouse is within the seekable range.
         if self._hover_mouse_x is not None:
-            target_bin = self._x_to_global_bin(self._hover_mouse_x, wd)
+            target_bin = wd.x_to_global_bin(self._hover_mouse_x, w)
             if 0 <= target_bin < wd.total_bins:
-                visual_col = target_bin - wd.viewport_start_bin
                 pen = QPen(HOVER_COLOR, 1)
                 painter.setPen(pen)
-                hx = col_to_x(visual_col)
+                hx = col_to_x(wd.global_bin_to_col(target_bin))
                 painter.drawLine(hx, 0, hx, h)
 
         pen = QPen(PLAYHEAD_COLOR, 2)
