@@ -232,7 +232,17 @@ class Player:
         if self.loop_active:
             start, end = self.loop.active_bounds()
             loop_len = end - start
-            if loop_len > 0:
+            # Wrap only when pos is below the loop start: this happens
+            # immediately after the feeder wraps pos_orig from end → start
+            # while the ring buffer still holds audio generated just before
+            # the wrap. In that moment we want to report a position "near
+            # end", matching the audio currently being heard.
+            #
+            # Don't wrap when pos == end exactly: that case arises when the
+            # user shrinks the loop to the current playhead via set_loop_end
+            # while paused, and we want the playhead to stay visually put
+            # rather than jumping to start.
+            if loop_len > 0 and pos < start:
                 pos = start + (pos - start) % loop_len
         return pos
 
@@ -463,11 +473,24 @@ class Player:
         loop = self.loop
         if loop is None or not loop.is_complete():
             return
-        loop.active = not loop.active
-        if loop.active:
+        if not loop.active:
+            # Turning loop on
+            loop.active = True
             if self._playback_pos >= loop.end_orig or self._playback_pos < loop.start_orig:
                 self.pos_orig = loop.start_orig
                 self._seek_requested = True
+        else:
+            # Turning loop off. The _playback_pos wrap formula was reporting
+            # the audio's actual position (compensating for buffered audio
+            # generated before pos_orig wrapped). Once that compensation goes
+            # away, we'd see pos_orig - buffered_orig directly, which can be
+            # well before the displayed position. Snap pos_orig to the
+            # displayed position and reset the feeder so the ring buffer
+            # matches.
+            current_pos = self._playback_pos
+            loop.active = False
+            self.pos_orig = current_pos
+            self._seek_requested = True
 
     def toggle_hold(self):
         if self.hold is not None:
