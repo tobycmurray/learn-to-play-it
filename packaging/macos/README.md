@@ -79,6 +79,7 @@ packaging/macos/make_dmg.sh            # for the dmg
 4. **Build dependencies**:
    ```
    brew install ffmpeg create-dmg imagemagick
+   pip install pip-audit  # in your dev venv; used by publish_release.sh
    ```
    ffmpeg is needed at *build time* so PyInstaller can find the libav* dylibs to
    bundle. The ffmpeg binary itself is not used at runtime — torchcodec calls libav*

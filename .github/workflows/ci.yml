@@ -44,3 +44,12 @@ jobs:
 
       - name: Run tests
         run: pytest tests/ -v --timeout=300
+
+      - name: Audit lock files for known vulnerabilities
+        # Informational for now — doesn't fail the build. Flip to failing
+        # once we trust the signal-to-noise ratio.
+        continue-on-error: true
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.lock
+          pip-audit -r requirements-gui.lock

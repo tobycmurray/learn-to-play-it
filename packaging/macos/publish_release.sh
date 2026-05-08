@@ -79,6 +79,24 @@ if gh release view "$TAG" >/dev/null 2>&1; then
     exit 1
 fi
 
+# Audit the lock files for known CVEs in bundled deps. The .app bundles its
+# own Python and dependencies, so anything vulnerable in the lock files
+# stays vulnerable in shipped users' installs until the next release. Refuse
+# to publish if pip-audit finds anything.
+echo "==> Auditing lock files for known vulnerabilities"
+if ! command -v pip-audit >/dev/null 2>&1; then
+    echo "ERROR: pip-audit not installed. Install with: pip install pip-audit" >&2
+    exit 1
+fi
+if ! pip-audit -r requirements.lock; then
+    echo "ERROR: vulnerabilities found in requirements.lock — fix before releasing." >&2
+    exit 1
+fi
+if ! pip-audit -r requirements-gui.lock; then
+    echo "ERROR: vulnerabilities found in requirements-gui.lock — fix before releasing." >&2
+    exit 1
+fi
+
 # --- show plan and confirm ---
 
 echo "Will:"
