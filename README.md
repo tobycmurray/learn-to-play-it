@@ -247,25 +247,6 @@ Use `--stems-dir` to store stems in a custom location (default: `./stems`).
 
 Separated stems are cached under `stems/<sha256-hash>/` based on the audio file's contents. This means renaming or moving the file won't trigger re-separation, and identical copies of the same file share stems. Re-running `separate` on an already-processed song is a no-op.
 
-## Getting audio from YouTube
-
-You can use [yt-dlp](https://github.com/yt-dlp/yt-dlp) to download audio from YouTube for use with ltpi:
-
-```bash
-# Install yt-dlp
-brew install yt-dlp        # macOS
-pip install yt-dlp         # or via pip
-
-# Download audio as MP3
-yt-dlp -x --audio-format mp3 -o "song.%(ext)s" "https://youtube.com/watch?v=..."
-
-# Then separate and practice
-ltpi separate song.mp3
-ltpi practice song.mp3 guitar
-```
-
-**Legal note**: Downloading audio from YouTube may violate YouTube's Terms of Service and could raise copyright concerns depending on your jurisdiction. Users are responsible for ensuring their use complies with applicable laws and terms. This tool is intended for personal practice and educational use.
-
 ## Possible future directions
 
 - MIDI / guitar tab transcription from isolated stems
