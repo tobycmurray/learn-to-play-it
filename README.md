@@ -67,7 +67,7 @@ Then launch with:
 ltpi-gui
 ```
 
-Open an audio file via File > Open. The app will separate stems automatically (with a progress bar), then present a setup dialog to choose your part and mode. The player window provides the same controls as the CLI with clickable buttons, draggable speed/pitch sliders, and a live waveform display.
+Open an audio file via File > Open, or drag and drop an audio file onto the main window. The app will separate stems automatically (with a progress bar), then present a setup dialog to choose your part and mode. The player window provides the same controls as the CLI with clickable buttons, draggable speed/pitch sliders, and a live waveform display.
 
 <p align="center">
   <img src="docs/screenshot.png" alt="GUI player" width="600">

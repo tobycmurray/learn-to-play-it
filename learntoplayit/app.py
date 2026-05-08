@@ -25,6 +25,8 @@ from .separate import STEM_NAMES
 
 APP_NAME = "Learn To Play It"
 
+AUDIO_EXTENSIONS = (".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac")
+
 def add_bundled_bin_to_path():
     if getattr(sys, "frozen", False):
         exe_dir = Path(sys.executable).resolve().parent
@@ -258,8 +260,25 @@ class AppWindow(QMainWindow):
         set_stems_root(default_stems_root())
 
         self._build_menu()
+        self.setAcceptDrops(True)
 
-        self.welcome = QLabel("Open an audio file to get started.\n\nFile → Open  (⌘O)")
+        welcome_html = (
+            "Open an audio file to get started.<br><br>"
+            "File → Open  (⌘O)<br>"
+            "or drag a file onto this window"
+        )
+        # The import guide at learntoplayit.com is macOS-specific (recommends
+        # Piezo, etc.). Only surface it when running on macOS.
+        if sys.platform == "darwin":
+            welcome_html += (
+                "<br><br>"
+                "<span style='font-size: 14px;'>Don't have an audio file? "
+                "<a href='https://learntoplayit.com/import.html'>How to capture one →</a>"
+                "</span>"
+            )
+        self.welcome = QLabel(welcome_html)
+        self.welcome.setTextFormat(Qt.RichText)
+        self.welcome.setOpenExternalLinks(True)
         self.welcome.setAlignment(Qt.AlignCenter)
         self.welcome.setStyleSheet("font-size: 18px; color: gray; padding: 60px;")
 
@@ -325,11 +344,33 @@ class AppWindow(QMainWindow):
         if self.player is not None:
             fn(self.player)
 
-    def _open_file(self, clean_stems=False):
-        path, _ = QFileDialog.getOpenFileName(
-            self, "Open Audio File", "",
-            "Audio Files (*.mp3 *.wav *.flac *.ogg *.m4a *.aac);;All Files (*)",
-        )
+    def dragEnterEvent(self, event):
+        if self._dropped_audio_path(event.mimeData()) is not None:
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        path = self._dropped_audio_path(event.mimeData())
+        if path is not None:
+            event.acceptProposedAction()
+            self._open_file(path=path)
+
+    @staticmethod
+    def _dropped_audio_path(mime_data):
+        if not mime_data.hasUrls():
+            return None
+        for url in mime_data.urls():
+            if url.isLocalFile():
+                local = url.toLocalFile()
+                if local.lower().endswith(AUDIO_EXTENSIONS):
+                    return local
+        return None
+
+    def _open_file(self, clean_stems=False, *, path=None):
+        if path is None:
+            path, _ = QFileDialog.getOpenFileName(
+                self, "Open Audio File", "",
+                "Audio Files (*.mp3 *.wav *.flac *.ogg *.m4a *.aac);;All Files (*)",
+            )
         if not path:
             return
 

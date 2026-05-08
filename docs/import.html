@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>How to import audio — Learn To Play It</title>
+  <meta name="description" content="Capture audio playing on your Mac and import it into Learn To Play It for practice.">
+  <link rel="icon" type="image/png" href="app_icon.png">
+  <link rel="apple-touch-icon" href="app_icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header class="hero" style="margin-bottom: 32px;">
+      <h1 style="margin-top: 0;">How to import audio</h1>
+      <p class="tagline">Got some audio you'd like to practice with? Here's how to get it into Learn To Play It.</p>
+    </header>
+
+    <p style="text-align: center; margin: 0 auto 64px; max-width: 720px;">
+      <img src="screenshot_dnd.png" alt="Drag a recording from Finder onto the Learn To Play It window" style="width: 100%; height: auto;">
+    </p>
+
+    <section class="prose">
+      <p>Learn To Play It works on audio files (mp3, m4a, wav, flac, ogg, aac). If you already have one, just drag it onto the app's main window — done. If you don't, the rest of this page walks you through capturing audio playing on your Mac.</p>
+
+      <h2>The general idea</h2>
+      <p>You can record any audio playing on your Mac to a file, then open that file in Learn To Play It. Several free and paid Mac apps make this easy. Below we walk through one specific recommendation in detail (<strong>Piezo</strong>), but any of the alternatives at the bottom will work.</p>
+
+      <h2>Recommended: Piezo</h2>
+      <p><a href="https://rogueamoeba.com/piezo/">Piezo</a> from Rogue Amoeba is a single-purpose audio recorder. It's the simplest tool we've found for this job. The free download works for recordings under 10 minutes per session (long enough for any normal track); the paid unlock ($19) removes the limit.</p>
+
+      <h3>One-time setup</h3>
+      <ol>
+        <li><strong>Download and install Piezo</strong> from <a href="https://rogueamoeba.com/piezo/">rogueamoeba.com/piezo</a>. The first launch walks you through approving its audio capture system extension — follow the prompts.</li>
+        <li>
+          <strong>Tick "Show file after recording"</strong> in Piezo's settings. Open Piezo's settings via the <em>Piezo → Settings…</em> menu (or press <kbd>⌘,</kbd>) and tick the checkbox. By default Piezo doesn't reveal recordings, which makes them annoying to find. With this on, each recording opens its Finder location automatically.
+          <p><img src="screenshot_piezo_settings.png" alt="Piezo Settings panel with 'Show file after recording' ticked" class="guide-img"></p>
+        </li>
+      </ol>
+
+      <h3>Recording audio</h3>
+      <ol>
+        <li><strong>Pick the source.</strong> In Piezo's source dropdown, choose the app that will be playing the audio.</li>
+        <li><strong>Hit Record</strong> in Piezo, then start the audio playing in the app you're recording from.</li>
+        <li>
+          <strong>Hit Stop</strong> when the audio finishes. Finder opens showing the recording.
+          <p><img src="screenshot_piezo_finder_window.png" alt="Finder window showing My Recording.mp3 in the Piezo folder" class="guide-img"></p>
+        </li>
+        <li><strong>Drag the file onto Learn To Play It's main window.</strong> The app will start separating stems automatically.</li>
+      </ol>
+
+      <p>That's it. The recording is saved as <code>~/Music/Piezo/My Recording.mp3</code> by default (configurable in Piezo's settings). The filename can be changed before recording by clicking the ⚙ settings icon beneath the record button.</p>
+
+      <h2>Alternatives</h2>
+      <p>Several other tools do the same job. Pick whatever you trust or already use.</p>
+      <ul>
+        <li><strong><a href="https://rogueamoeba.com/audiohijack/">Audio Hijack</a></strong> ($64, also Rogue Amoeba) — more powerful, with audio effects, scheduling, and multi-source mixing. Overkill for this use case, but useful if you do other audio work.</li>
+        <li><strong><a href="https://existential.audio/blackhole/">BlackHole</a> + QuickTime Player</strong> (free) — BlackHole is a virtual audio driver. Set up a Multi-Output Device in Audio MIDI Setup that includes BlackHole, route system audio to it, then record in QuickTime Player using BlackHole as the input. More fiddly than Piezo but completely free.</li>
+        <li><strong><a href="https://obsproject.com/">OBS Studio</a></strong> (free) — open-source screen-recording tool that can capture audio. Heavyweight for this purpose but well-known.</li>
+      </ul>
+
+      <h2>A note on what's allowed</h2>
+      <p>Capture audio you have legitimate access to record. Most streaming services prohibit capturing their content under their terms of service — that's between you and the service, not us. This tool is intended for personal practice and educational use.</p>
+    </section>
+
+    <footer>
+      <p>
+        <a href="/">← back to learntoplayit.com</a> ·
+        <a href="https://github.com/tobycmurray/learn-to-play-it">View source on GitHub</a>
+      </p>
+    </footer>
+  </main>
+</body>
+</html>
