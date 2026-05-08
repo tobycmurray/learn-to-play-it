@@ -69,6 +69,41 @@ class HoldState:
     pos: int = 0
 
 
+def _compute_listener_pos(pos_orig: int, buffered_orig: int,
+                          loop_bounds: tuple[int, int] | None) -> int:
+    """Translate the producer cursor into the position currently being heard.
+
+    The feeder thread runs ahead of the audio callback, writing audio into a
+    ring buffer. `pos_orig` is the producer-side cursor — the next source
+    sample the feeder will read. The listener trails the producer by however
+    much audio is currently buffered between them (`buffered_orig`, in
+    source-sample units).
+
+    For non-looping playback this is just `pos_orig - buffered_orig`. For
+    looping playback the feeder periodically wraps `pos_orig` from `end` back
+    to `start` while the ring buffer still holds audio for samples just
+    before `end`. In that brief window `pos_orig - buffered_orig` is below
+    `start`, and we wrap-forward to "near end" so the displayed position
+    matches the audio actually being heard.
+
+    The wrap is *only* applied when pos < start. Two cases that look similar
+    but must NOT wrap:
+
+      - pos == end exactly: arises when the user shrinks the loop to their
+        current playhead via set_loop_end. We want the playhead to stay
+        visually put (at end) rather than jump to start.
+
+      - pos in [start, end): obviously no wrap needed; pos is already in range.
+    """
+    pos = max(0, pos_orig - buffered_orig)
+    if loop_bounds is not None:
+        start, end = loop_bounds
+        loop_len = end - start
+        if loop_len > 0 and pos < start:
+            pos = start + (pos - start) % loop_len
+    return pos
+
+
 @dataclass
 class WaveformData:
     """A snapshot of the waveform viewport.
@@ -228,23 +263,8 @@ class Player:
     @property
     def _playback_pos(self):
         buffered_orig = int(self.ring.available() * self.speed)
-        pos = max(0, self.pos_orig - buffered_orig)
-        if self.loop_active:
-            start, end = self.loop.active_bounds()
-            loop_len = end - start
-            # Wrap only when pos is below the loop start: this happens
-            # immediately after the feeder wraps pos_orig from end → start
-            # while the ring buffer still holds audio generated just before
-            # the wrap. In that moment we want to report a position "near
-            # end", matching the audio currently being heard.
-            #
-            # Don't wrap when pos == end exactly: that case arises when the
-            # user shrinks the loop to the current playhead via set_loop_end
-            # while paused, and we want the playhead to stay visually put
-            # rather than jumping to start.
-            if loop_len > 0 and pos < start:
-                pos = start + (pos - start) % loop_len
-        return pos
+        loop_bounds = self.loop.active_bounds() if self.loop_active else None
+        return _compute_listener_pos(self.pos_orig, buffered_orig, loop_bounds)
 
     @property
     def _time_ratio(self):
