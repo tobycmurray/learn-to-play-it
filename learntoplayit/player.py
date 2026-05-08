@@ -71,9 +71,12 @@ class HoldState:
 @dataclass
 class WaveformData:
     bins: np.ndarray
-    cursor_col: int
-    loop_start_col: int | None
-    loop_end_col: int | None
+    # Column positions are fractional (sub-bin precision) so the GUI can render
+    # the playhead and loop markers at their exact location within a bin
+    # rather than snapped to bin boundaries. The TUI rounds to int.
+    cursor_col: float
+    loop_start_col: float | None
+    loop_end_col: float | None
     loop_active: bool
 
 
@@ -338,20 +341,25 @@ class Player:
         bins /= self._mix_peaks[self.mode]
         np.clip(bins, 0, 1, out=bins)
 
+        # Sub-bin-precision cursor: bins are anchored at pos_snapped, so the
+        # cursor moves smoothly through its bin as playback advances within it
+        # then "shifts" back to the bin's left edge when crossing a boundary.
+        cursor_col = (self._playback_pos - window_start) / bin_samples
+
         loop_start_col = None
         loop_end_col = None
         loop = self.loop
         if loop is not None:
             if loop.start_orig is not None:
-                col = (loop.start_orig - window_start) // bin_samples
+                col = (loop.start_orig - window_start) / bin_samples
                 if 0 <= col < num_bins:
                     loop_start_col = col
             if loop.end_orig is not None:
-                col = (loop.end_orig - window_start) // bin_samples
+                col = (loop.end_orig - window_start) / bin_samples
                 if 0 <= col < num_bins:
                     loop_end_col = col
 
-        return WaveformData(bins=bins, cursor_col=half, loop_start_col=loop_start_col, loop_end_col=loop_end_col, loop_active=self.loop_active)
+        return WaveformData(bins=bins, cursor_col=cursor_col, loop_start_col=loop_start_col, loop_end_col=loop_end_col, loop_active=self.loop_active)
 
     # --- Commands ---
 

@@ -112,12 +112,14 @@ class TerminalDisplay:
 
     @staticmethod
     def _marker_line(waveform_data, width):
+        # Column positions are fractional (sub-bin precision); round for the
+        # character grid.
         markers = [" "] * width
-        markers[waveform_data.cursor_col] = "↑"
+        markers[min(width - 1, int(round(waveform_data.cursor_col)))] = "↑"
         if waveform_data.loop_start_col is not None:
-            markers[waveform_data.loop_start_col] = "["
+            markers[min(width - 1, int(round(waveform_data.loop_start_col)))] = "["
         if waveform_data.loop_end_col is not None:
-            markers[waveform_data.loop_end_col] = "]"
+            markers[min(width - 1, int(round(waveform_data.loop_end_col)))] = "]"
         return "  " + "".join(markers)
 
     def _print_status(self):

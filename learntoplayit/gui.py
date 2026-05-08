@@ -24,6 +24,7 @@ LOOP_MARKER_COLOR = QColor(255, 200, 40)
 LOOP_FILL_COLOR = QColor(255, 200, 40, 30)
 LOOP_SERIF = 6
 WAVEFORM_BG = QColor(30, 30, 35)
+HOVER_COLOR = QColor(180, 180, 180, 140)
 WAVEFORM_PAD = 4
 MONO_FONT = "'Menlo', 'Courier New'"
 
@@ -125,6 +126,42 @@ class WaveformWidget(QWidget):
         self.player = None
         self.setMinimumHeight(220)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.setCursor(Qt.PointingHandCursor)
+        self.setMouseTracking(True)
+        self._hover_col = None
+
+    def mouseMoveEvent(self, event):
+        if self.player is None:
+            return
+        w = self.width()
+        if w < 10:
+            return
+        bar_w = w / WAVEFORM_BINS
+        new_col = int(event.position().x() / bar_w)
+        if new_col != self._hover_col:
+            self._hover_col = new_col
+            self.update()
+
+    def leaveEvent(self, event):
+        if self._hover_col is not None:
+            self._hover_col = None
+            self.update()
+
+    def mousePressEvent(self, event):
+        if self.player is None or event.button() != Qt.LeftButton:
+            return super().mousePressEvent(event)
+        w = self.width()
+        if w < 10:
+            return
+        # Snap clicks to the start of the bin clicked: rendering has sub-bin
+        # precision but the visible amplitude envelope is bin-quantised, so
+        # there's no useful sub-bin information for the user to target.
+        bar_w = w / WAVEFORM_BINS
+        clicked_col = int(event.position().x() / bar_w)
+        cursor_col = self.player.waveform_bins(WAVEFORM_BINS).cursor_col
+        delta_seconds = (clicked_col - cursor_col) * NUDGE_SECONDS
+        self.player.seek(delta_seconds)
+        self.update()
 
     def paintEvent(self, event):
         w = self.width()
@@ -154,7 +191,9 @@ class WaveformWidget(QWidget):
                 painter.drawRect(x, mid - half_h, bw, half_h * 2)
 
         def col_to_x(col):
-            return int((col + 0.5) * bar_w)
+            # cursor_col / loop_*_col are fractional column positions, so the
+            # marker sits at its exact sub-bin location.
+            return int(col * bar_w)
 
         ls_x = col_to_x(wd.loop_start_col) if wd.loop_start_col is not None else None
         le_x = col_to_x(wd.loop_end_col) if wd.loop_end_col is not None else None
@@ -176,6 +215,15 @@ class WaveformWidget(QWidget):
             painter.drawLine(le_x, top, le_x, bot)
             painter.drawLine(le_x, top, le_x - LOOP_SERIF, top)
             painter.drawLine(le_x, bot, le_x - LOOP_SERIF, bot)
+
+        # Hover indicator: shows where a click would land (start of the
+        # hovered bin). Drawn before the playhead so the playhead can sit on
+        # top if they coincide.
+        if self._hover_col is not None and 0 <= self._hover_col < WAVEFORM_BINS:
+            pen = QPen(HOVER_COLOR, 1)
+            painter.setPen(pen)
+            hx = col_to_x(self._hover_col)
+            painter.drawLine(hx, 0, hx, h)
 
         pen = QPen(PLAYHEAD_COLOR, 2)
         painter.setPen(pen)
