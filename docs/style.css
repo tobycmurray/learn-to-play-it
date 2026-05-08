@@ -42,6 +42,26 @@ a:hover {
   text-decoration: underline;
 }
 
+.brand-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--fg);
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 32px;
+}
+
+.brand-link:hover {
+  text-decoration: none;
+  opacity: 0.7;
+}
+
+.brand-logo {
+  width: 32px;
+  height: 32px;
+}
+
 .hero {
   text-align: center;
   margin-bottom: 64px;

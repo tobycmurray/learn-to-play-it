@@ -85,6 +85,7 @@ echo "Will:"
 echo "  1. Tag commit $LOCAL as $TAG"
 echo "  2. Push the tag to origin"
 echo "  3. Create GitHub release $TAG with $DMG attached"
+echo "  4. Update docs/index.html version label and download link to $TAG, then push"
 echo
 
 if [[ "$ASSUME_YES" -ne 1 ]]; then
