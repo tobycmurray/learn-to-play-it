@@ -131,11 +131,22 @@ fi
 
 echo "==> Updating website (docs/index.html) to point at $TAG"
 WEBSITE="docs/index.html"
+APP="dist/Learn To Play It.app"
 if [[ -f "$WEBSITE" ]]; then
-    sed -i '' \
-        -e "s|releases/download/v[0-9.]*/Learn-To-Play-It-[0-9.]*\.dmg|releases/download/${TAG}/Learn-To-Play-It-${VERSION}.dmg|" \
-        -e "s|<span id=\"version\">Version [0-9.]*</span>|<span id=\"version\">Version ${VERSION}</span>|" \
-        "$WEBSITE"
+    SED_ARGS=(
+        -e "s|releases/download/v[0-9.]*/Learn-To-Play-It-[0-9.]*\.dmg|releases/download/${TAG}/Learn-To-Play-It-${VERSION}.dmg|"
+        -e "s|<span id=\"version\">Version [0-9.]*</span>|<span id=\"version\">Version ${VERSION}</span>|"
+    )
+    # Pull the minimum macOS version straight from the bundled .app's Info.plist
+    # (set by patch_info_plist.py from the highest minos across bundled binaries).
+    # If the floor changes between releases, the website tracks it automatically.
+    if [[ -d "$APP" ]]; then
+        MIN_MACOS=$(defaults read "$(pwd)/${APP}/Contents/Info.plist" LSMinimumSystemVersion 2>/dev/null || true)
+        if [[ -n "$MIN_MACOS" ]]; then
+            SED_ARGS+=(-e "s|<span id=\"min-macos\">[0-9.]*</span>|<span id=\"min-macos\">${MIN_MACOS}</span>|")
+        fi
+    fi
+    sed -i '' "${SED_ARGS[@]}" "$WEBSITE"
     if git diff --quiet "$WEBSITE"; then
         echo "    (no change — website was already at $VERSION)"
     else
