@@ -132,7 +132,10 @@ class TerminalDisplay:
 
         if show_waveform and waveform_width >= 10:
             wd = p.waveform_bins(waveform_width)
-            rows = self._bins_to_rows(wd.bins)
+            # waveform_bins returns waveform_width + 1 bins so the GUI can
+            # render a partial bin at the right edge. The TUI is character-grid
+            # so we just use the first waveform_width bins.
+            rows = self._bins_to_rows(wd.bins[:waveform_width])
             markers = self._marker_line(wd, waveform_width)
             body = [f"  {row}"[:term_width] for row in rows] + [markers[:term_width]]
         else:

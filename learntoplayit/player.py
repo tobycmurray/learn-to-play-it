@@ -70,14 +70,28 @@ class HoldState:
 
 @dataclass
 class WaveformData:
+    """A snapshot of the waveform viewport.
+
+    The whole song's amplitude envelope is precomputed as a fixed grid of
+    NUDGE_SECONDS-wide bins. The viewport slides smoothly across that grid:
+    `viewport_start_bin` is the fractional global bin index of the viewport's
+    left edge, and `bin_offset` (== viewport_start_bin - floor(viewport_start_bin))
+    says how far through bin 0 of `bins` the viewport's left edge sits.
+
+    `bins` has length num_bins + 1 so the GUI can render a partial bin at
+    each edge as the viewport offset changes.
+
+    Column positions for `cursor_col` and the loop markers are fractional
+    (sub-bin precision). The GUI uses them as-is; the TUI rounds.
+    """
     bins: np.ndarray
-    # Column positions are fractional (sub-bin precision) so the GUI can render
-    # the playhead and loop markers at their exact location within a bin
-    # rather than snapped to bin boundaries. The TUI rounds to int.
+    bin_offset: float
     cursor_col: float
     loop_start_col: float | None
     loop_end_col: float | None
     loop_active: bool
+    viewport_start_bin: float
+    total_bins: int  # total bins in the song (defines the seekable range)
 
 
 class Player:
@@ -108,7 +122,9 @@ class Player:
 
         self.click_active = self._click_track is not None
         self.count_in_enabled = self._count_in_track is not None
-        self._mix_peaks = {mode: self._compute_rms_peak(mix) for mode, mix in self.mixes.items()}
+        # Precompute the full normalized amplitude envelope per mode. This is
+        # the canonical bin grid for the song; waveform_bins() just slices.
+        self._all_bins = {mode: self._compute_normalized_bins(mix) for mode, mix in self.mixes.items()}
 
         self.ring = RingBuffer(RING_CAPACITY, self.channels)
         self.stretcher = self._make_stretcher()
@@ -142,15 +158,19 @@ class Player:
             return click_track, None, 0
         return click_track, ci_result[0], ci_result[1]
 
-    def _compute_rms_peak(self, mix):
+    def _compute_normalized_bins(self, mix):
+        """Compute the full RMS-bin envelope for a mix and normalize to [0, 1]."""
         bin_samples = int(NUDGE_SECONDS * self.sr)
         mono = np.abs(mix).max(axis=1) if mix.ndim > 1 else np.abs(mix.ravel())
         n_bins = len(mono) // bin_samples
         if n_bins == 0:
-            return 1.0
+            return np.zeros(0, dtype=np.float32)
         trimmed = mono[:n_bins * bin_samples].reshape(n_bins, bin_samples)
-        rms = np.sqrt(np.mean(trimmed ** 2, axis=1))
-        return float(rms.max()) or 1.0
+        bins = np.sqrt(np.mean(trimmed ** 2, axis=1)).astype(np.float32)
+        peak = float(bins.max()) or 1.0
+        bins /= peak
+        np.clip(bins, 0, 1, out=bins)
+        return bins
 
     @property
     def playback_position(self):
@@ -314,52 +334,49 @@ class Player:
 
     def waveform_bins(self, num_bins):
         bin_samples = int(NUDGE_SECONDS * self.sr)
-        half = num_bins // 2
-        pos_snapped = (self._playback_pos // bin_samples) * bin_samples
-        window_start = pos_snapped - half * bin_samples
+        all_bins = self._all_bins[self.mode]
+        total_bins = len(all_bins)
 
-        mix = self.mixes[self.mode]
-        end = window_start + num_bins * bin_samples
-        pad_left = max(0, -window_start)
-        pad_right = max(0, end - self.song_len)
-        segment = mix[max(0, window_start):min(self.song_len, end)]
-        if self.channels > 1:
-            segment = np.abs(segment).max(axis=1)
-        else:
-            segment = np.abs(segment.ravel())
-        if pad_left > 0 or pad_right > 0:
-            segment = np.concatenate([
-                np.zeros(pad_left, dtype=np.float32),
-                segment,
-                np.zeros(pad_right, dtype=np.float32),
-            ])
+        # Cursor sits at the fixed visual centre of the viewport; the viewport
+        # slides smoothly across the song's canonical bin grid as playback advances.
+        cursor_bin = self._playback_pos / bin_samples
+        viewport_start_bin = cursor_bin - num_bins / 2
+        start_int = int(np.floor(viewport_start_bin))
+        bin_offset = float(viewport_start_bin - start_int)
 
-        bins = np.array([
-            np.sqrt(np.mean(segment[i * bin_samples:(i + 1) * bin_samples] ** 2))
-            for i in range(num_bins)
-        ])
-        bins /= self._mix_peaks[self.mode]
-        np.clip(bins, 0, 1, out=bins)
-
-        # Sub-bin-precision cursor: bins are anchored at pos_snapped, so the
-        # cursor moves smoothly through its bin as playback advances within it
-        # then "shifts" back to the bin's left edge when crossing a boundary.
-        cursor_col = (self._playback_pos - window_start) / bin_samples
+        # Slice (num_bins + 1) bins from the cache — one extra so the GUI can
+        # render the partial bin at the right edge. Pad with zeros where the
+        # viewport extends outside the song.
+        bins = np.zeros(num_bins + 1, dtype=np.float32)
+        src_start = max(0, start_int)
+        src_end = min(total_bins, start_int + num_bins + 1)
+        if src_end > src_start:
+            dst_start = src_start - start_int
+            bins[dst_start:dst_start + (src_end - src_start)] = all_bins[src_start:src_end]
 
         loop_start_col = None
         loop_end_col = None
         loop = self.loop
         if loop is not None:
             if loop.start_orig is not None:
-                col = (loop.start_orig - window_start) / bin_samples
+                col = loop.start_orig / bin_samples - viewport_start_bin
                 if 0 <= col < num_bins:
                     loop_start_col = col
             if loop.end_orig is not None:
-                col = (loop.end_orig - window_start) / bin_samples
+                col = loop.end_orig / bin_samples - viewport_start_bin
                 if 0 <= col < num_bins:
                     loop_end_col = col
 
-        return WaveformData(bins=bins, cursor_col=cursor_col, loop_start_col=loop_start_col, loop_end_col=loop_end_col, loop_active=self.loop_active)
+        return WaveformData(
+            bins=bins,
+            bin_offset=bin_offset,
+            cursor_col=num_bins / 2,
+            loop_start_col=loop_start_col,
+            loop_end_col=loop_end_col,
+            loop_active=self.loop_active,
+            viewport_start_bin=float(viewport_start_bin),
+            total_bins=total_bins,
+        )
 
     # --- Commands ---
 
