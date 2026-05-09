@@ -5,6 +5,10 @@ cd "$(dirname "$0")/../.."
 
 export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-11.0}"
 
+# we try to target back in time macos by using an older Python (Python 3.12 is from 2023)
+# we also use an older ffmpeg (ffmpeg 8) which we install using Conda
+# but we don't use conda for python to avoid compatibility issues that arise otherwise
+
 PYTHON_ORG="${PYTHON_ORG:-/Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12}"
 BUILD_VENV="${BUILD_VENV:-.build-venv}"
 

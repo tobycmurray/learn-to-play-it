@@ -78,12 +78,31 @@ packaging/macos/make_dmg.sh            # for the dmg
    ```
 4. **Build dependencies**:
    ```
-   brew install ffmpeg create-dmg imagemagick
+   brew install create-dmg imagemagick
    pip install pip-audit  # in your dev venv; used by publish_release.sh
    ```
-   ffmpeg is needed at *build time* so PyInstaller can find the libav* dylibs to
-   bundle. The ffmpeg binary itself is not used at runtime — torchcodec calls libav*
-   in-process via Python bindings. See "Why we don't bundle the ffmpeg binary" below.
+
+   Install python.org Python 3.12. The build script currently expects:
+
+   ```
+   /Library/Frameworks/Python.framework/Versions/3.12/bin/python3.12
+   ```
+
+   Install Miniforge/Conda. Conda is used only as a source of conda-forge
+   FFmpeg dylibs for the packaged app. It is **not** used as the bundled Python
+   runtime.
+
+   The build script creates the FFmpeg vendor environment automatically if
+   needed, equivalent to:
+
+   ```
+   conda create -y -n ltp-ffmpeg -c conda-forge "ffmpeg>=8,<9"
+   ```
+
+   We intentionally do **not** vendor FFmpeg from Homebrew for release builds.
+   Homebrew is convenient for development, but its dylibs may be built with the
+   host macOS deployment target and can accidentally raise the packaged app's
+   minimum macOS version.
 
 Verify everything is in place:
 ```
@@ -103,6 +122,34 @@ NOTARY_PROFILE=other-profile \
   packaging/macos/release.sh
 ```
 
+The app build script also supports environment overrides such as:
+
+```
+PYTHON_ORG=/path/to/python3.12 \
+FFMPEG_CONDA_ENV=ltp-ffmpeg \
+FFMPEG_CONDA_SPEC="ffmpeg>=8,<9" \
+REGENERATE_LOCK=0 \
+  packaging/macos/build_app.sh --clean
+```
+
+Use `REGENERATE_LOCK=0` for release builds once the lockfile is settled. During
+packaging experiments, regenerating the lockfile can be useful, but it makes
+builds less reproducible.
+
+## Python and FFmpeg sources
+
+The release build deliberately separates Python from FFmpeg:
+
+| Component | Source | Why |
+| --- | --- | --- |
+| Python runtime | python.org Python 3.12 | Avoids Homebrew/Conda Python deployment-target and `sys.version` quirks |
+| Python packages | pip wheels in `.build-venv` | Reproducible from `requirements-gui.lock` |
+| FFmpeg dylibs | conda-forge via `ltp-ffmpeg` | Provides low-`minos` shared libraries for `torchcodec` |
+| App bundle | PyInstaller | Packages Python runtime, app code, wheels, and native libraries |
+| Minimum macOS | computed post-build | Prevents `Info.plist` from understating true binary requirements |
+
+The important rule is: do not vendor FFmpeg from Homebrew for release builds.
+
 ## Entitlements
 
 The `.app` is signed with hardened runtime and **no entitlements**. Empirically
@@ -119,15 +166,21 @@ delete the file.
 ## Pre-release test procedure
 
 Before publishing, verify the .app is genuinely self-contained — i.e. it doesn't
-silently rely on anything from your dev machine that won't exist on a user's.
-The single most decisive test simulates a clean Mac without Homebrew or any
-cached model weights:
+silently rely on Homebrew, Miniforge/Conda, cached model weights, or any other
+dev-machine state that won't exist on a user's Mac.
+
+The single most decisive test simulates a clean Mac without Homebrew or Conda
+or any cached model weights:
 
 ```
 # 1. Move Homebrew out of the way. Your shell PATH will lose python3, gh,
 #    ffmpeg, etc. — that's the point. Use absolute paths (/usr/bin/open) for
 #    anything you need to invoke.
 sudo mv /opt/homebrew /opt/homebrew.disabled
+
+# 1a. Do likewise with conda:
+mv "$HOME/miniforge3" "$HOME/miniforge3.disabled"
+
 
 # 2. Delete the torch hub cache so the app has to download model weights fresh
 #    on first launch. This exercises the HTTPS / certificate code path.
@@ -146,15 +199,16 @@ open /Applications/"Learn To Play It.app"
 #    a fresh model download fails with a clean error dialog rather than a
 #    silent crash.
 
-# 6. Restore Homebrew. DON'T FORGET.
+# 6. Restore Homebrew and Conda. DON'T FORGET.
+mv "$HOME/miniforge3.disabled" "$HOME/miniforge3"
 sudo mv /opt/homebrew.disabled /opt/homebrew
 ```
 
-If the .app launches and runs end-to-end with `/opt/homebrew` gone and the
-torch cache empty, it has no hidden dev-machine dependencies. The `verify_bundle.py`
-build-time check should catch most issues earlier, but this is the only test
-that catches "library X was findable on my machine but won't be on a user's"
-issues that don't show up as @rpath refs.
+If the .app launches and runs end-to-end with `/opt/homebrew` and miniforge3
+gone and the torch cache empty, it has no hidden dev-machine dependencies.
+The `verify_bundle.py` build-time check should catch most issues earlier, but
+this is the only test that catches "library X was findable on my machine but
+won't be on a user's" issues that don't show up as @rpath refs.
 
 A less invasive alternative is to do the same test from a freshly-created
 Standard user account on your Mac (System Settings → Users & Groups → Add
@@ -166,22 +220,52 @@ explicitly).
 
 ## Bundling ffmpeg's transitive native deps
 
-`torchcodec` links against ffmpeg's libav* shared libraries (libavutil,
-libavformat, libavcodec, libswresample, ...). Those in turn link against codec
-libraries like libx264, libx265, libvpx, libaom, libdav1d, etc. PyInstaller's
-automatic dependency analysis catches the libav* libraries and most of their
-direct deps, but historically misses some transitive ones — for example
-`libx265` is referenced via `@rpath/libx265.NNN.dylib` and was silently omitted
-from earlier builds, producing an .app that crashed on any user's machine.
+`torchcodec` links against FFmpeg's `libav*` shared libraries (`libavutil`,
+`libavformat`, `libavcodec`, `libswresample`, ...). Those in turn link against
+codec and support libraries such as `libx264`, `libx265`, `libvpx`, `libaom`,
+`libdav1d`, OpenSSL, zstd, libxml2, and others.
 
-The spec works around this by walking `otool -L` recursively from the
-Homebrew-installed `libav*`/`libsw*` and bundling every `/opt/homebrew/...`
-dylib in the closure. `verify_bundle.py` then fails the build if any
-`@rpath/<name>` reference inside the bundle still points at a missing file.
+For release builds we intentionally do **not** vendor FFmpeg from Homebrew.
+Homebrew is convenient for development, but its dylibs may be built with the
+current host macOS deployment target, which can accidentally raise the packaged
+app's minimum macOS version.
 
-If you ever upgrade Homebrew packages and ffmpeg's link set changes, the spec
-auto-discovers the new closure on the next build. No manual list to keep in
-sync.
+Instead, the release build uses:
+
+- python.org Python as the bundled Python runtime; and
+- a small Conda/Miniforge environment only as the source of conda-forge FFmpeg
+  dylibs.
+
+`build_app.sh` sets `FFMPEG_LIB_DIR` to the Conda environment's `lib` directory
+before invoking PyInstaller. The spec file then inspects the installed
+`torchcodec` binaries to discover which FFmpeg backend variants are present.
+
+`torchcodec` may ship multiple FFmpeg backend variants, for example FFmpeg
+4/5/6/7/8 support. The spec selects the newest backend whose required dylibs are
+present in `FFMPEG_LIB_DIR`, then recursively walks `otool -L` from those dylibs
+and bundles the full vendor-local dependency closure.
+
+The spec deliberately preserves ABI-name dylibs and symlinks such as
+`libavdevice.62.dylib`, because `torchcodec` may reference those exact names via
+`@rpath`. Collapsing everything to the fully-versioned target file, such as
+`libavdevice.62.3.101.dylib`, can leave unresolved `@rpath` references in the
+final app.
+
+The spec also filters out unused `torchcodec` backend binaries. For example, if
+the Conda vendor environment provides FFmpeg 8 and the spec selects
+`torchcodec`'s FFmpeg 8 backend, then older `torchcodec` FFmpeg 4/5/6/7 backend
+binaries are omitted from the bundle. This avoids shipping unused binaries that
+contain unresolved references to FFmpeg ABI versions we are not bundling.
+
+`verify_bundle.py` fails the build if any `@rpath/<name>` reference inside the
+bundle still points at a missing file. `patch_info_plist.py` computes
+`LSMinimumSystemVersion` from the actual Mach-O binaries bundled into the app.
+
+If the FFmpeg package in the vendor Conda environment changes, the spec should
+auto-discover the matching `torchcodec` backend and its dependency closure on
+the next build. The important invariant is that `FFMPEG_LIB_DIR` must point at a
+Conda/Miniforge FFmpeg install whose dylibs have an acceptable Mach-O deployment
+target.
 
 ## Why we don't bundle the ffmpeg binary
 
@@ -190,18 +274,20 @@ Earlier versions of the spec bundled `ffmpeg` and `ffprobe` into
 
 - demucs has multiple audio backends; the ffmpeg-binary backend is only one of
   them and the torchcodec backend covers everything we need.
-- torchcodec uses the **libav* shared libraries** directly via Python bindings —
-  it does not invoke the ffmpeg binary as a subprocess.
-- PyInstaller's dependency analysis already bundles the libav* dylibs into
-  `Contents/Resources/` automatically, because torchcodec links against them.
+- torchcodec uses the **libav* shared libraries** directly via Python/native
+  bindings — it does not invoke the ffmpeg binary as a subprocess.
+- The packaged app needs the FFmpeg shared-library set and its dependency
+  closure, not the `ffmpeg` command-line executable.
 
-So the ffmpeg binary was redundant. We do still require ffmpeg to be installed at
-build time (via Homebrew) so PyInstaller can find those libav* dylibs.
+So the ffmpeg binary is redundant in the packaged app.
 
-A `shutil.which("ffmpeg")` check still exists in `app.py` and `cli.py`, but it
-runs only when **not frozen** (i.e. dev mode running from source). In dev mode,
-torchcodec needs the libav* from `/opt/homebrew/opt/ffmpeg/lib/`, and the check
-gives a friendly "install ffmpeg with brew" message if it's missing.
+A `shutil.which("ffmpeg")` check may still exist in `app.py` and `cli.py`, but
+it should run only when **not frozen** (i.e. dev mode running from source). In
+dev mode, torchcodec needs some FFmpeg installation available on the developer
+machine, and the check gives a friendly "install ffmpeg" message if it is
+missing.
+
+In frozen/release mode, the app should rely only on bundled shared libraries.
 
 ## Minimum macOS version
 
@@ -215,6 +301,14 @@ macOS, the .app will declare it automatically. No drift, no risk of shipping a
 
 The script also sets `CFBundleShortVersionString` and `CFBundleVersion` from
 `pyproject.toml`, again to keep things consistent.
+
+Current practical notes:
+
+- Apple Silicon implies macOS 11+ as a realistic lower bound.
+- Earlier Homebrew Python/FFmpeg builds accidentally raised the floor to macOS 26.
+- Switching to python.org Python and conda-forge FFmpeg removed that accidental floor.
+- PySide6 6.9.x lowered the Qt/PySide floor.
+- Current builds are likely limited by NumPy wheels at macOS 14.0 unless NumPy changes.
 
 ## DMG background image
 
