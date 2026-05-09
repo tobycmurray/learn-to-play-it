@@ -16,7 +16,7 @@ A tool that helps musicians learn parts from recorded songs by:
 
 ## Download (macOS)
 
-**Apple Silicon Mac running macOS 26.0 (Tahoe) or later**: download the latest `.dmg` from the [releases page](https://github.com/tobycmurray/learn-to-play-it/releases/latest), open it, and drag **Learn To Play It** into your Applications folder. Then launch from Spotlight, Launchpad, or the Applications folder.
+**Apple Silicon Mac running macOS 14.0 (Sonoma) or later**: download the latest `.dmg` from the [releases page](https://github.com/tobycmurray/learn-to-play-it/releases/latest), open it, and drag **Learn To Play It** into your Applications folder. Then launch from Spotlight, Launchpad, or the Applications folder.
 
 The app is signed and notarized, so it launches without Gatekeeper warnings. No need to install FFmpeg, Python, or anything else — everything is bundled.
 
@@ -148,23 +148,23 @@ A waveform is rendered when playback is paused, allowing precise control of loop
 Controls: SPACE=play/pause  W/S=speed  E/D=pitch  Z/X/C/V=seek  H=hold
           [/]=loop start/end  L=loop  B=click  N=count-in  1/2/3=solo/backing/mix  0=restart  Q=quit
 
-  ⏸ 1:45.54 / 3:19.22  |  speed: 70%  |  pitch: 0c  |  loop: ON 1:42.27-1:48.30  |  click: ON  |  count-in: ON  |  mode: solo  |  part: guitar  
-                                                                                                                                                
-                                                        ▃                                  ▇                                                    
-                      ▇                                 █▁           ▃                    ▂█       ▅▁                                           
-                     ▂█       ▁            ▂            ██       ▁   █                    ██▆▁     ██           ▇                ▁              
-        ▆            ██▆▁     █▇  ▅▄       █        ▆   ██▅      █▃  █▃      ▄        ▇▁  ████     ██▅          █        ▄   ▂   █▁             
-        █▂       ▄▅▂ ████     ██▅ ██▆▃     █▅▁     ▁█▇▃ ███▇    ▄██▄▁██▄     █▆       ██▄ ████▂    ███▃▁▆▁      █▂      ▇█▅▁ █▄ ▁██▂     ▂▁▁    
-  ▂▁▁▁ ▂██▅▄▁▃▁ ▁███▇████▆▁▁▁ ███▄████▅▄▃▁▆███▄▁▄▂▁████▅████▇▇▅▃████████▆▂▁▁ ██▅▄▄▄▁▁▁███▆█████▂▁  ███████▆▂▂▁▁▃██▇▄▂▃▂ ████▂██▇████▅▂   ███▅▂  
-  ████▇████████▇█████████████▆██████████████████████████████████████████████▆████████████████████▆▆████████████████████▇██████████████▇▅▅█████  
-  ▂▁▁▁ ▂██▅▄▁▃▁ ▁███▇████▆▁▁▁ ███▄████▅▄▃▁▆███▄▁▄▂▁████▅████▇▇▅▃████████▆▂▁▁ ██▅▄▄▄▁▁▁███▆█████▂▁  ███████▆▂▂▁▁▃██▇▄▂▃▂ ████▂██▇████▅▂   ███▅▂  
-        █▂       ▄▅▂ ████     ██▅ ██▆▃     █▅▁     ▁█▇▃ ███▇    ▄██▄▁██▄     █▆       ██▄ ████▂    ███▃▁▆▁      █▂      ▇█▅▁ █▄ ▁██▂     ▂▁▁    
-        ▆            ██▆▁     █▇  ▅▄       █        ▆   ██▅      █▃  █▃      ▄        ▇▁  ████     ██▅          █        ▄   ▂   █▁             
-                     ▂█       ▁            ▂            ██       ▁   █                    ██▆▁     ██           ▇                ▁              
-                      ▇                                 █▁           ▃                    ▂█       ▅▁                                           
-                                                        ▃                                  ▇                                                    
-                                                                                                                                                
-       [                                                                ↑                                                      ]                
+  ⏸ 1:45.54 / 3:19.22  |  speed: 70%  |  pitch: 0c  |  loop: ON 1:42.27-1:48.30  |  click: ON  |  count-in: ON  |  mode: solo  |  part: guitar
+
+                                                        ▃                                  ▇
+                      ▇                                 █▁           ▃                    ▂█       ▅▁
+                     ▂█       ▁            ▂            ██       ▁   █                    ██▆▁     ██           ▇                ▁
+        ▆            ██▆▁     █▇  ▅▄       █        ▆   ██▅      █▃  █▃      ▄        ▇▁  ████     ██▅          █        ▄   ▂   █▁
+        █▂       ▄▅▂ ████     ██▅ ██▆▃     █▅▁     ▁█▇▃ ███▇    ▄██▄▁██▄     █▆       ██▄ ████▂    ███▃▁▆▁      █▂      ▇█▅▁ █▄ ▁██▂     ▂▁▁
+  ▂▁▁▁ ▂██▅▄▁▃▁ ▁███▇████▆▁▁▁ ███▄████▅▄▃▁▆███▄▁▄▂▁████▅████▇▇▅▃████████▆▂▁▁ ██▅▄▄▄▁▁▁███▆█████▂▁  ███████▆▂▂▁▁▃██▇▄▂▃▂ ████▂██▇████▅▂   ███▅▂
+  ████▇████████▇█████████████▆██████████████████████████████████████████████▆████████████████████▆▆████████████████████▇██████████████▇▅▅█████
+  ▂▁▁▁ ▂██▅▄▁▃▁ ▁███▇████▆▁▁▁ ███▄████▅▄▃▁▆███▄▁▄▂▁████▅████▇▇▅▃████████▆▂▁▁ ██▅▄▄▄▁▁▁███▆█████▂▁  ███████▆▂▂▁▁▃██▇▄▂▃▂ ████▂██▇████▅▂   ███▅▂
+        █▂       ▄▅▂ ████     ██▅ ██▆▃     █▅▁     ▁█▇▃ ███▇    ▄██▄▁██▄     █▆       ██▄ ████▂    ███▃▁▆▁      █▂      ▇█▅▁ █▄ ▁██▂     ▂▁▁
+        ▆            ██▆▁     █▇  ▅▄       █        ▆   ██▅      █▃  █▃      ▄        ▇▁  ████     ██▅          █        ▄   ▂   █▁
+                     ▂█       ▁            ▂            ██       ▁   █                    ██▆▁     ██           ▇                ▁
+                      ▇                                 █▁           ▃                    ▂█       ▅▁
+                                                        ▃                                  ▇
+
+       [                                                                ↑                                                      ]
 ```
 
 **Modes** -- chosen using number keys 1 (solo), 2 (backing), and 3(mix):
