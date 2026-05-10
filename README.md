@@ -16,7 +16,7 @@ A tool that helps musicians learn parts from recorded songs by:
 
 ## Download (macOS)
 
-**Apple Silicon Mac running macOS 14.0 (Sonoma) or later**: download the latest `.dmg` from the [releases page](https://github.com/tobycmurray/learn-to-play-it/releases/latest), open it, and drag **Learn To Play It** into your Applications folder. Then launch from Spotlight, Launchpad, or the Applications folder.
+**Apple Silicon Mac running recent macOS**: download the latest `.dmg` from [learntoplayit.com](https://learntoplayit.com), which lists the minimum macOS requirement. Open the `.dmg`, and drag **Learn To Play It** into your Applications folder to install. Then launch from Spotlight, Launchpad, or the Applications folder.
 
 The app is signed and notarized, so it launches without Gatekeeper warnings. No need to install FFmpeg, Python, or anything else — everything is bundled.
 
