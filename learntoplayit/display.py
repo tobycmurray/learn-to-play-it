@@ -116,6 +116,10 @@ class TerminalDisplay:
         # character grid.
         width = wd.num_bins
         markers = [" "] * width
+        for col in wd.beat_cols:
+            markers[min(width - 1, int(round(col)))] = "."
+        for col in wd.downbeat_cols:
+            markers[min(width - 1, int(round(col)))] = "|"
         markers[min(width - 1, int(round(wd.cursor_col)))] = "↑"
         if wd.loop_start_col is not None:
             markers[min(width - 1, int(round(wd.loop_start_col)))] = "["

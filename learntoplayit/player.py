@@ -123,9 +123,12 @@ class WaveformData:
 
     `bins` has length num_bins + 1 so the renderer can show a partial bin at
     the right edge as the viewport offset changes. Use `num_bins` to discover
-    the logical viewport width.
+    the logical viewport width. Beat and loop markers are exposed as viewport
+    columns, ready for callers to convert to pixels or terminal cells.
     """
     bins: np.ndarray
+    beat_cols: list[float]
+    downbeat_cols: list[float]
     viewport_start_bin: float
     loop_start_col: float | None
     loop_end_col: float | None
@@ -181,7 +184,7 @@ class Player:
         self.channels = self.mixes["solo"].shape[1] if self.mixes["solo"].ndim > 1 else 1
         self.song_len = len(self.mixes["solo"])
 
-        self._click_track, self._count_in_track, self._count_in_start = self._load_beats(stems_dir)
+        self._beats_data, self._click_track, self._count_in_track, self._count_in_start = self._load_beats(stems_dir)
 
         self.click_active = self._click_track is not None
         self.count_in_enabled = self._count_in_track is not None
@@ -212,14 +215,14 @@ class Player:
 
         beats_data = load_beats_from_dir(Path(stems_dir))
         if beats_data is None:
-            return None, None, 0
+            return None, None, None, 0
 
         click_track = render_click_track(beats_data, self.song_len, self.sr, self.channels)
 
         ci_result = compute_count_in(beats_data, self.sr, self.channels)
         if ci_result is None:
-            return click_track, None, 0
-        return click_track, ci_result[0], ci_result[1]
+            return beats_data, click_track, None, 0
+        return beats_data, click_track, ci_result[0], ci_result[1]
 
     def _compute_normalized_bins(self, mix):
         """Compute the full RMS-bin envelope for a mix and normalize to [0, 1]."""
@@ -411,6 +414,19 @@ class Player:
             dst_start = src_start - start_int
             bins[dst_start:dst_start + (src_end - src_start)] = all_bins[src_start:src_end]
 
+        beat_cols = []
+        downbeat_cols = []
+        beats_data = self._beats_data
+        if beats_data is not None:
+            downbeat_samples = {int(t * self.sr) for t in beats_data.get("downbeats", [])}
+            for beat_time in beats_data.get("beats", []):
+                col = beat_time / NUDGE_SECONDS - viewport_start_bin
+                if 0 <= col < num_bins:
+                    if int(beat_time * self.sr) in downbeat_samples:
+                        downbeat_cols.append(col)
+                    else:
+                        beat_cols.append(col)
+
         loop_start_col = None
         loop_end_col = None
         loop = self.loop
@@ -426,6 +442,8 @@ class Player:
 
         return WaveformData(
             bins=bins,
+            beat_cols=beat_cols,
+            downbeat_cols=downbeat_cols,
             viewport_start_bin=float(viewport_start_bin),
             loop_start_col=loop_start_col,
             loop_end_col=loop_end_col,

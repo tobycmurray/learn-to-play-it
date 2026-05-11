@@ -20,12 +20,18 @@ from .fmt import fmt_time, fmt_pitch
 WAVEFORM_BINS = 100
 WAVEFORM_COLOR = QColor(70, 130, 220)
 PLAYHEAD_COLOR = QColor(255, 60, 60)
+BEAT_RULER_COLOR = QColor(230, 230, 220, 70)
+BEAT_TICK_COLOR = QColor(230, 230, 220, 135)
+DOWNBEAT_TICK_COLOR = QColor(245, 245, 230, 210)
 LOOP_MARKER_COLOR = QColor(255, 200, 40)
 LOOP_FILL_COLOR = QColor(255, 200, 40, 30)
 LOOP_SERIF = 6
 WAVEFORM_BG = QColor(30, 30, 35)
 HOVER_COLOR = QColor(180, 180, 180, 140)
-WAVEFORM_PAD = 4
+WAVEFORM_PAD_TOP = 6
+WAVEFORM_PAD_BOTTOM = 18
+BEAT_TICK_H = 6
+DOWNBEAT_TICK_H = 12
 MONO_FONT = "'Menlo', 'Courier New'"
 
 WINDOW_MIN_W = 1100
@@ -161,9 +167,11 @@ class WaveformWidget(QWidget):
     def paintEvent(self, event):
         w = self.width()
         h = self.height()
-        pad = WAVEFORM_PAD
-        inner_h = h - 2 * pad
-        mid = h // 2
+        top_pad = WAVEFORM_PAD_TOP
+        bottom_pad = WAVEFORM_PAD_BOTTOM
+        inner_h = h - top_pad - bottom_pad
+        mid = top_pad + inner_h // 2
+        ruler_y = h - bottom_pad // 2
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing, False)
 
@@ -194,6 +202,22 @@ class WaveformWidget(QWidget):
         def col_to_x(col):
             return int(col * bar_w)
 
+        ruler_pen = QPen(BEAT_RULER_COLOR, 1)
+        painter.setPen(ruler_pen)
+        painter.drawLine(0, ruler_y, w, ruler_y)
+
+        beat_pen = QPen(BEAT_TICK_COLOR, 1)
+        painter.setPen(beat_pen)
+        for col in wd.beat_cols:
+            x = col_to_x(col)
+            painter.drawLine(x, ruler_y - BEAT_TICK_H, x, ruler_y)
+
+        downbeat_pen = QPen(DOWNBEAT_TICK_COLOR, 2)
+        painter.setPen(downbeat_pen)
+        for col in wd.downbeat_cols:
+            x = col_to_x(col)
+            painter.drawLine(x, ruler_y - DOWNBEAT_TICK_H, x, ruler_y)
+
         ls_x = col_to_x(wd.loop_start_col) if wd.loop_start_col is not None else None
         le_x = col_to_x(wd.loop_end_col) if wd.loop_end_col is not None else None
 
@@ -204,8 +228,8 @@ class WaveformWidget(QWidget):
 
         pen = QPen(LOOP_MARKER_COLOR, 2)
         painter.setPen(pen)
-        top = pad
-        bot = h - pad
+        top = top_pad
+        bot = ruler_y
         if ls_x is not None:
             painter.drawLine(ls_x, top, ls_x, bot)
             painter.drawLine(ls_x, top, ls_x + LOOP_SERIF, top)
