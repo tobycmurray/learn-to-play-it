@@ -26,6 +26,7 @@ DOWNBEAT_TICK_COLOR = QColor(245, 245, 230, 210)
 LOOP_MARKER_COLOR = QColor(255, 200, 40)
 LOOP_FILL_COLOR = QColor(255, 200, 40, 30)
 LOOP_SERIF = 6
+SNAP_MODIFIER = Qt.ShiftModifier
 WAVEFORM_BG = QColor(30, 30, 35)
 HOVER_COLOR = QColor(180, 180, 180, 140)
 WAVEFORM_PAD_TOP = 6
@@ -134,6 +135,7 @@ class WaveformWidget(QWidget):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setCursor(Qt.PointingHandCursor)
         self.setMouseTracking(True)
+        self.setToolTip("Click to seek. Hold Shift to snap to the nearest beat.")
         # Mouse pixel x while hovering over the widget, or None when the
         # cursor is elsewhere. Resolved to a global bin in paintEvent so the
         # hover line tracks the mouse (not the song content) as playback scrolls.
@@ -150,16 +152,28 @@ class WaveformWidget(QWidget):
             self._hover_mouse_x = None
             self.update()
 
+    def _target_col_for_x(self, x, wd, modifiers):
+        col = x / self.width() * wd.num_bins
+        global_bin = wd.viewport_start_bin + col
+        if not (0 <= global_bin < wd.total_bins):
+            return None
+
+        if modifiers & SNAP_MODIFIER:
+            beat_cols = wd.beat_cols + wd.downbeat_cols
+            if beat_cols:
+                col = min(beat_cols, key=lambda beat_col: abs(beat_col - col))
+        return col
+
     def mousePressEvent(self, event):
         if self.player is None or event.button() != Qt.LeftButton:
             return super().mousePressEvent(event)
         if self.width() < 10:
             return
         wd = self.player.waveform_bins(WAVEFORM_BINS)
-        target_bin = wd.x_to_global_bin(event.position().x(), self.width())
-        if not (0 <= target_bin < wd.total_bins):
+        target_col = self._target_col_for_x(event.position().x(), wd, event.modifiers())
+        if target_col is None:
             return
-        target_seconds = target_bin * NUDGE_SECONDS
+        target_seconds = (wd.viewport_start_bin + target_col) * NUDGE_SECONDS
         delta = target_seconds - self.player.playback_position
         self.player.seek(delta)
         self.update()
@@ -241,13 +255,14 @@ class WaveformWidget(QWidget):
 
         # Hover indicator: anchored to the mouse position rather than the song
         # content, so it stays under the cursor as playback scrolls past.
-        # Only drawn when the bin under the mouse is within the seekable range.
+        # With the snap modifier held, it moves to the nearest beat marker.
+        # Only drawn when the target is within the seekable range.
         if self._hover_mouse_x is not None:
-            target_bin = wd.x_to_global_bin(self._hover_mouse_x, w)
-            if 0 <= target_bin < wd.total_bins:
+            target_col = self._target_col_for_x(self._hover_mouse_x, wd, QApplication.keyboardModifiers())
+            if target_col is not None:
                 pen = QPen(HOVER_COLOR, 1)
                 painter.setPen(pen)
-                hx = col_to_x(wd.global_bin_to_col(target_bin))
+                hx = col_to_x(target_col)
                 painter.drawLine(hx, 0, hx, h)
 
         pen = QPen(PLAYHEAD_COLOR, 2)
