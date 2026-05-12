@@ -3,6 +3,7 @@ import sys
 import tty
 import termios
 import select
+import math
 
 from .player import (
     SPEED_STEP, PITCH_STEP, SEEK_SECONDS, NUDGE_SECONDS,
@@ -111,20 +112,38 @@ class TerminalDisplay:
         return rows
 
     @staticmethod
+    def _chunk_cell_for_col(wd, col):
+        """Map a fractional viewport column onto the TUI's chunk grid.
+
+        The TUI waveform renders one whole NUDGE_SECONDS chunk per character,
+        starting at floor(viewport_start_bin). Markers must use the same grid:
+        two positions inside the same song chunk should render in the same
+        terminal cell, even when the GUI would draw them at different x pixels.
+        """
+        cell = math.floor(wd.viewport_start_bin + col) - math.floor(wd.viewport_start_bin)
+        if 0 <= cell < wd.num_bins:
+            return cell
+        return None
+
+    @staticmethod
     def _marker_line(wd):
-        # Column positions are fractional (sub-bin precision); round for the
-        # character grid.
         width = wd.num_bins
         markers = [" "] * width
+
+        def put(col, marker):
+            cell = TerminalDisplay._chunk_cell_for_col(wd, col)
+            if cell is not None:
+                markers[cell] = marker
+
         for col in wd.beat_cols:
-            markers[min(width - 1, int(round(col)))] = "."
+            put(col, ".")
         for col in wd.downbeat_cols:
-            markers[min(width - 1, int(round(col)))] = "|"
-        markers[min(width - 1, int(round(wd.cursor_col)))] = "↑"
+            put(col, "|")
+        put(wd.cursor_col, "↑")
         if wd.loop_start_col is not None:
-            markers[min(width - 1, int(round(wd.loop_start_col)))] = "["
+            put(wd.loop_start_col, "[")
         if wd.loop_end_col is not None:
-            markers[min(width - 1, int(round(wd.loop_end_col)))] = "]"
+            put(wd.loop_end_col, "]")
         return "  " + "".join(markers)
 
     def _print_status(self):
