@@ -57,6 +57,18 @@ packaging/macos/sign_and_notarize.sh   # for the .app
 packaging/macos/make_dmg.sh            # for the dmg
 ```
 
+**Bump dependencies** (refresh the lockfiles with newer versions from PyPI):
+```
+packaging/update_locks.sh --upgrade    # bump existing pins to latest
+# or
+packaging/update_locks.sh              # add/remove deps after editing pyproject.toml
+```
+Lockfiles (`requirements.lock`, `requirements-gui.lock`) are committed
+artifacts pinned by SHA-256, so the build pipeline can use `--require-hashes`.
+Review the diff, then commit. CI catches a missed regen after a `pyproject.toml`
+edit (red ✗ on the `lockfile-audit` job) but does not block the push.
+The script uses `uv pip compile --universal` so lockfiles work cross-platform.
+
 ## One-time setup on a new Mac
 
 1. **Apple Developer account** with a Developer ID Application certificate. The
@@ -79,7 +91,7 @@ packaging/macos/make_dmg.sh            # for the dmg
 4. **Build dependencies**:
    ```
    brew install create-dmg imagemagick
-   pip install pip-audit  # in your dev venv; used by publish_release.sh
+   pip install pip-audit uv  # pip-audit: publish_release.sh; uv: update_locks.sh
    ```
 
    Install python.org Python 3.12. The build script currently expects:
@@ -128,13 +140,12 @@ The app build script also supports environment overrides such as:
 PYTHON_ORG=/path/to/python3.12 \
 FFMPEG_CONDA_ENV=ltp-ffmpeg \
 FFMPEG_CONDA_SPEC="ffmpeg>=8,<9" \
-REGENERATE_LOCK=0 \
   packaging/macos/build_app.sh --clean
 ```
 
-Use `REGENERATE_LOCK=0` for release builds once the lockfile is settled. During
-packaging experiments, regenerating the lockfile can be useful, but it makes
-builds less reproducible.
+The build script installs from `requirements-gui.lock` with `--require-hashes`
+and does **not** regenerate the lockfile. To bump dependencies, see the
+"Bump dependencies" workflow above — lockfiles are committed artifacts.
 
 ## Python and FFmpeg sources
 
