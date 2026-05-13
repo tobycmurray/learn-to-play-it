@@ -3,6 +3,36 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
+# Refuse to build if /opt/homebrew is present. PyInstaller's macholib resolver
+# has a hardcoded fallback that searches /opt/homebrew/opt/<formula>/lib/ when
+# resolving @rpath basenames it can't satisfy locally. Even with PATH trimmed
+# and DYLD_LIBRARY_PATH unset, macholib silently pulls in Homebrew codec
+# dylibs (libx264, libx265, libvmaf, libdav1d, libvpx) — and those are built
+# against the host SDK, so a single leaked codec raises the .app's
+# LSMinimumSystemVersion via patch_info_plist.py.
+#
+# The spec also has a leakage guard (see learn-to-play-it.spec), but failing
+# here is cheaper than running through Analysis only to abort.
+if [[ -d "/opt/homebrew" && "${LTPI_ALLOW_HOMEBREW:-0}" != "1" ]]; then
+    cat >&2 <<'EOF'
+ERROR: /opt/homebrew is present. PyInstaller will silently bundle Homebrew
+codec dylibs and raise the .app's LSMinimumSystemVersion to whatever Homebrew
+was built against. Move it aside before building a release:
+
+    sudo mv /opt/homebrew /opt/homebrew.disabled
+    packaging/macos/release.sh --clean
+    # ... sign, notarize, dmg, pre-release smoke test ...
+    sudo mv /opt/homebrew.disabled /opt/homebrew
+
+For developer iteration where a high minos doesn't matter, override the check:
+
+    LTPI_ALLOW_HOMEBREW=1 packaging/macos/build_app.sh
+
+(The spec's leakage guard will still log which Homebrew dylibs got pulled in.)
+EOF
+    exit 1
+fi
+
 export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-11.0}"
 
 # we try to target back in time macos by using an older Python (Python 3.12 is from 2023)

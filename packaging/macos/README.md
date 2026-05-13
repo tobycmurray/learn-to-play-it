@@ -20,13 +20,21 @@ Scripts for building, signing, notarizing, and packaging the macOS distribution.
 ```
 # 1. Decide what version this release is. Edit pyproject.toml if you need to bump it.
 
-# 2. Build, sign, notarize, dmg.
+# 2. Move Homebrew aside (release builds must be Homebrew-free — see below).
+sudo mv /opt/homebrew /opt/homebrew.disabled
+
+# 3. Build, sign, notarize, dmg.
 packaging/macos/release.sh --clean
 
-# 3. Tag the commit and create the GitHub release.
+# 4. Pre-release smoke test (see "Pre-release test procedure" below).
+
+# 5. Restore Homebrew.
+sudo mv /opt/homebrew.disabled /opt/homebrew
+
+# 6. Tag the commit and create the GitHub release.
 packaging/macos/publish_release.sh
 
-# 4. Bump pyproject.toml to the next planned version (e.g. 0.2.0 → 0.3.0), commit, push.
+# 7. Bump pyproject.toml to the next planned version (e.g. 0.2.0 → 0.3.0), commit, push.
 ```
 
 `publish_release.sh` refuses to run unless: working tree is clean, current branch
@@ -39,9 +47,18 @@ The version number lives **only** in `pyproject.toml`. `make_dmg.sh` and
 
 **Iterate on the .app build** without paying for notarization each time:
 ```
+# Release-quality build (Homebrew moved aside; produces a low-minos .app):
+sudo mv /opt/homebrew /opt/homebrew.disabled
 packaging/macos/build_app.sh --clean
 open "dist/Learn To Play It.app"
+sudo mv /opt/homebrew.disabled /opt/homebrew
+
+# Fast iteration where minos doesn't matter (Homebrew stays put):
+LTPI_ALLOW_HOMEBREW=1 packaging/macos/build_app.sh --clean
 ```
+The `LTPI_ALLOW_HOMEBREW=1` build is **not** suitable for distribution — it
+will bundle Homebrew codec dylibs and elevate `LSMinimumSystemVersion`. The
+spec's leakage guard will log which dylibs got pulled in.
 
 **Iterate on the .dmg layout** (background image position, icon placement):
 ```
@@ -79,6 +96,36 @@ packaging/update_ffmpeg.sh             # rebuild env from current lockfile (sani
 lockfile pinning FFmpeg + every transitive native dep by URL + SHA-256.
 `build_app.sh` refuses to proceed if the conda env diverges from this file.
 Override the spec for `--upgrade` via `FFMPEG_CONDA_SPEC="ffmpeg=8.2..."`.
+
+## Why release builds require Homebrew to be moved aside
+
+`build_app.sh` refuses to run when `/opt/homebrew` exists, because PyInstaller's
+macholib resolver has a hardcoded fallback that searches
+`/opt/homebrew/opt/<formula>/lib/` when resolving `@rpath` basenames it can't
+satisfy locally. Trimming `PATH` and unsetting `DYLD_LIBRARY_PATH` (which
+`build_app.sh` does) doesn't disable this — it's compiled into macholib.
+
+When that fallback fires, PyInstaller silently bundles Homebrew codec dylibs
+(libx264, libx265, libvmaf, libdav1d, libvpx) for binaries in the analysis
+closure that have weak deps on them. Those Homebrew dylibs are built against
+the host SDK (recent macOS), so a single leaked codec raises the .app's
+`LSMinimumSystemVersion` via `patch_info_plist.py`. We've observed minos jump
+to macOS 26 from a single leaked `libvmaf.3.dylib`.
+
+Empirically the leaked codecs aren't actually used at runtime — `mv`-ing
+Homebrew aside produces an .app with `minos=14.0` that still works end-to-end.
+So the leakage is pure noise that ratchets the macOS floor for no benefit.
+
+The defenses, in order:
+
+1. `build_app.sh` pre-check refuses if `/opt/homebrew` is present.
+2. The spec's leakage guard (see `_check_homebrew_leakage` in `learn-to-play-it.spec`)
+   detects any `/opt/homebrew/`, `/usr/local/Cellar/`, or `/usr/local/opt/` path
+   in `a.binaries` after Analysis, attributes referrers via `otool -L`, and
+   refuses to bundle them.
+
+Set `LTPI_ALLOW_HOMEBREW=1` to override both for developer iteration. The
+spec guard still logs the leaks. The resulting .app must not be released.
 
 ## One-time setup on a new Mac
 
