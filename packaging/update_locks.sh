@@ -6,9 +6,14 @@ set -euo pipefail
 # can use --require-hashes. Run this whenever you change dependencies in
 # pyproject.toml, or when you want to pick up upstream releases.
 #
-# Workflow: run this, review the diff (it's normal to see version churn and a
-# big hash refresh), commit, push. CI checks that pyproject.toml and the
-# lockfiles don't drift.
+# Uses `uv pip compile --universal` so the lockfiles work on macOS arm64
+# (where we build the .app) and Linux (where CI runs and where source users
+# install). pip-tools cannot produce truly cross-platform lockfiles —
+# platform-conditional deps like cuda-toolkit are absent from a macOS-resolved
+# lockfile, breaking installs on Linux.
+#
+# Workflow: run this, review the diff, commit, push. CI checks that
+# pyproject.toml and the lockfiles don't drift.
 #
 # Usage:
 #   packaging/update_locks.sh           # respect existing pins where possible
@@ -21,13 +26,13 @@ if [[ "${1:-}" == "--upgrade" ]]; then
     UPGRADE="--upgrade"
 fi
 
-if ! command -v pip-compile >/dev/null 2>&1; then
-    echo "pip-compile not found. Install it with: pip install pip-tools" >&2
+if ! command -v uv >/dev/null 2>&1; then
+    echo "uv not found. Install it with: pip install uv  (or: brew install uv)" >&2
     exit 1
 fi
 
-pip-compile $UPGRADE --generate-hashes --allow-unsafe --output-file requirements.lock pyproject.toml
-pip-compile $UPGRADE --generate-hashes --allow-unsafe --extra=gui --output-file requirements-gui.lock pyproject.toml
+uv pip compile $UPGRADE --universal --generate-hashes --output-file requirements.lock pyproject.toml
+uv pip compile $UPGRADE --universal --generate-hashes --extra=gui --output-file requirements-gui.lock pyproject.toml
 
 echo
 echo "Regenerated requirements.lock and requirements-gui.lock."

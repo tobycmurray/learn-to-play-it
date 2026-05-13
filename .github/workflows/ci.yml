@@ -45,19 +45,19 @@ jobs:
       - name: Run tests
         run: pytest tests/ -v --timeout=300
 
-      - name: Audit lock files for known vulnerabilities
-        run: |
-          pip install pip-audit
-          pip-audit -r requirements.lock
-          pip-audit -r requirements-gui.lock
-
-  lockfile-fresh:
-    # Notification-only check: regenerates the lockfiles from pyproject.toml
-    # and fails (red ✗ → email) if the committed lockfiles drift. Does not
-    # block pushes — GitHub runs CI after the push lands. The fix is to run
-    # packaging/update_locks.sh, review the diff, and commit.
+  lockfile-audit:
+    # Two checks here:
+    #   1. pip-audit against the lockfiles (known CVEs).
+    #   2. lockfile-fresh: regenerate from pyproject.toml and fail if the
+    #      committed lockfiles drift, so a missed update_locks.sh after a
+    #      pyproject.toml edit shows up as a red ✗ + notification email.
+    #      Does not block pushes — GitHub runs CI after the push lands.
+    #
+    # Runs on ubuntu-latest because uv pip compile --universal produces
+    # cross-platform lockfiles (markers like `; sys_platform == 'linux'` on
+    # CUDA deps), so the regen is platform-independent.
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
 
@@ -66,13 +66,18 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install pip-tools
-        run: pip install pip-tools
+      - name: Install uv and pip-audit
+        run: pip install uv pip-audit
+
+      - name: Audit lock files for known vulnerabilities
+        run: |
+          pip-audit -r requirements.lock
+          pip-audit -r requirements-gui.lock
 
       - name: Regenerate lockfiles
         run: |
-          pip-compile --quiet --generate-hashes --allow-unsafe --output-file requirements.lock pyproject.toml
-          pip-compile --quiet --generate-hashes --allow-unsafe --extra=gui --output-file requirements-gui.lock pyproject.toml
+          uv pip compile --quiet --universal --generate-hashes --output-file requirements.lock pyproject.toml
+          uv pip compile --quiet --universal --generate-hashes --extra=gui --output-file requirements-gui.lock pyproject.toml
 
       - name: Fail if lockfiles drifted
         run: |
