@@ -69,6 +69,17 @@ Review the diff, then commit. CI catches a missed regen after a `pyproject.toml`
 edit (red ✗ on the `lockfile-audit` job) but does not block the push.
 The script uses `uv pip compile --universal` so lockfiles work cross-platform.
 
+**Bump FFmpeg** (refresh the conda vendor env with newer FFmpeg / transitive deps):
+```
+packaging/update_ffmpeg.sh --upgrade   # solve fresh from FFMPEG_CONDA_SPEC
+# or
+packaging/update_ffmpeg.sh             # rebuild env from current lockfile (sanity check)
+```
+`packaging/macos/ffmpeg-conda-lock.txt` is a committed conda explicit-format
+lockfile pinning FFmpeg + every transitive native dep by URL + SHA-256.
+`build_app.sh` refuses to proceed if the conda env diverges from this file.
+Override the spec for `--upgrade` via `FFMPEG_CONDA_SPEC="ffmpeg=8.2..."`.
+
 ## One-time setup on a new Mac
 
 1. **Apple Developer account** with a Developer ID Application certificate. The
@@ -105,11 +116,11 @@ The script uses `uv pip compile --universal` so lockfiles work cross-platform.
    runtime.
 
    The build script creates the FFmpeg vendor environment automatically if
-   needed, equivalent to:
-
-   ```
-   conda create -y -n ltp-ffmpeg -c conda-forge "ffmpeg>=8,<9"
-   ```
+   needed, from the committed `packaging/macos/ffmpeg-conda-lock.txt`. Every
+   package is pinned by URL + SHA-256; conda validates each archive against
+   its hash during install, so a tampered or republished package fails the
+   build loudly. To refresh, run `packaging/update_ffmpeg.sh` (see the "Bump
+   FFmpeg" workflow above).
 
    We intentionally do **not** vendor FFmpeg from Homebrew for release builds.
    Homebrew is convenient for development, but its dylibs may be built with the
@@ -139,13 +150,15 @@ The app build script also supports environment overrides such as:
 ```
 PYTHON_ORG=/path/to/python3.12 \
 FFMPEG_CONDA_ENV=ltp-ffmpeg \
-FFMPEG_CONDA_SPEC="ffmpeg>=8,<9" \
+FFMPEG_CONDA_LOCK=packaging/macos/ffmpeg-conda-lock.txt \
   packaging/macos/build_app.sh --clean
 ```
 
-The build script installs from `requirements-gui.lock` with `--require-hashes`
-and does **not** regenerate the lockfile. To bump dependencies, see the
-"Bump dependencies" workflow above — lockfiles are committed artifacts.
+The build script installs Python deps from `requirements-gui.lock` and
+conda packages from `ffmpeg-conda-lock.txt`, both with hash validation,
+and does **not** regenerate either lockfile. To bump deps, see the
+"Bump dependencies" and "Bump FFmpeg" workflows above — lockfiles are
+committed artifacts.
 
 ## Python and FFmpeg sources
 
@@ -155,7 +168,7 @@ The release build deliberately separates Python from FFmpeg:
 | --- | --- | --- |
 | Python runtime | python.org Python 3.12 | Avoids Homebrew/Conda Python deployment-target and `sys.version` quirks |
 | Python packages | pip wheels in `.build-venv` | Reproducible from `requirements-gui.lock` |
-| FFmpeg dylibs | conda-forge via `ltp-ffmpeg` | Provides low-`minos` shared libraries for `torchcodec` |
+| FFmpeg dylibs | conda-forge via `ltp-ffmpeg` | Reproducible from `packaging/macos/ffmpeg-conda-lock.txt`; provides low-`minos` shared libraries for `torchcodec` |
 | App bundle | PyInstaller | Packages Python runtime, app code, wheels, and native libraries |
 | Minimum macOS | computed post-build | Prevents `Info.plist` from understating true binary requirements |
 

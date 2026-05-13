@@ -15,7 +15,7 @@ BUILD_VENV="${BUILD_VENV:-.build-venv}"
 # Conda is used only as a source of low-minos FFmpeg dylibs.
 # The shipped Python runtime comes from python.org, not Conda.
 FFMPEG_CONDA_ENV="${FFMPEG_CONDA_ENV:-ltp-ffmpeg}"
-FFMPEG_CONDA_SPEC="${FFMPEG_CONDA_SPEC:-ffmpeg>=8,<9}"
+FFMPEG_CONDA_LOCK="${FFMPEG_CONDA_LOCK:-packaging/macos/ffmpeg-conda-lock.txt}"
 
 LOCK_FILE="${LOCK_FILE:-requirements-gui.lock}"
 SPEC_FILE="${SPEC_FILE:-packaging/macos/learn-to-play-it.spec}"
@@ -39,8 +39,23 @@ fi
 eval "$(conda shell.bash hook)"
 
 if ! conda env list | awk '{print $1}' | grep -qx "$FFMPEG_CONDA_ENV"; then
-    echo "Creating FFmpeg vendor env: $FFMPEG_CONDA_ENV"
-    conda create -y -n "$FFMPEG_CONDA_ENV" -c conda-forge "$FFMPEG_CONDA_SPEC"
+    echo "Creating FFmpeg vendor env $FFMPEG_CONDA_ENV from $FFMPEG_CONDA_LOCK"
+    # conda validates the SHA-256 of each downloaded archive against the
+    # hash recorded in the lockfile during install. Tampered or republished
+    # bytes will fail the build loudly here.
+    conda create -y -n "$FFMPEG_CONDA_ENV" --file "$FFMPEG_CONDA_LOCK"
+else
+    # Env exists. Fail fast if its package set diverges from the committed
+    # lockfile, so we never bundle stale dylibs that don't match what's in
+    # git. To refresh, run packaging/update_ffmpeg.sh.
+    env_pkgs=$(conda list -n "$FFMPEG_CONDA_ENV" --explicit --sha256 | grep '^https://' | sort)
+    file_pkgs=$(grep '^https://' "$FFMPEG_CONDA_LOCK" | sort)
+    if [[ "$env_pkgs" != "$file_pkgs" ]]; then
+        echo "ERROR: Conda env $FFMPEG_CONDA_ENV does not match $FFMPEG_CONDA_LOCK." >&2
+        echo "Run packaging/update_ffmpeg.sh to refresh, or remove the env" >&2
+        echo "with 'conda env remove -y -n $FFMPEG_CONDA_ENV' to let build_app.sh recreate it." >&2
+        exit 1
+    fi
 fi
 
 FFMPEG_CONDA_PREFIX="$(
@@ -62,7 +77,7 @@ echo "Deployment target:     $MACOSX_DEPLOYMENT_TARGET"
 # verify_bundle.py handle that later.
 if ! find "$FFMPEG_LIB_DIR" -maxdepth 1 \( -name 'libav*.dylib' -o -name 'libsw*.dylib' \) | grep -q .; then
     echo "ERROR: No FFmpeg libav*/libsw* dylibs found in $FFMPEG_LIB_DIR" >&2
-    echo "Try: conda install -y -n $FFMPEG_CONDA_ENV -c conda-forge '$FFMPEG_CONDA_SPEC'" >&2
+    echo "Run packaging/update_ffmpeg.sh to recreate the env from $FFMPEG_CONDA_LOCK." >&2
     exit 1
 fi
 
