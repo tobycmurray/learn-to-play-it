@@ -458,9 +458,5 @@ app = BUNDLE(
         # LSMinimumSystemVersion are set by patch_info_plist.py post-build, so
         # they match pyproject.toml and the actually bundled binaries.
         "NSHighResolutionCapable": True,
-        "NSMicrophoneUsageDescription": (
-            "Learn To Play It uses audio input/output features while helping you "
-            "learn musical parts from songs."
-        ),
     },
 )
