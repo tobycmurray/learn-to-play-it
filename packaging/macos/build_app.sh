@@ -95,11 +95,14 @@ import sys
 print("Build sys.version:    ", repr(sys.version))
 PY
 
-python -m pip install --upgrade pip "setuptools<82" wheel
+python -m pip install --upgrade pip
 
 # Hash-pinned install: pip refuses any wheel whose sha256 doesn't match the
-# pin in $LOCK_FILE. To bump deps, run packaging/update_locks.sh, review the
-# diff, and commit — the lockfile is a controlled artifact, not a build output.
+# pin in $LOCK_FILE. setuptools is pinned inside the lockfile (uv includes it
+# automatically); wheel and PEP 517 build backends are not needed in the
+# environment because every dep installs from a pre-built wheel.
+# To bump deps, run packaging/update_locks.sh, review the diff, and commit —
+# the lockfile is a controlled artifact, not a build output.
 python -m pip install --require-hashes -r "$LOCK_FILE"
 python -m pip install -e '.[gui]' --no-deps
 python -m pip install pyinstaller

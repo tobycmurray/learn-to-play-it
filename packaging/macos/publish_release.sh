@@ -89,11 +89,11 @@ if ! command -v pip-audit >/dev/null 2>&1; then
     exit 1
 fi
 if ! pip-audit -r requirements.lock; then
-    echo "ERROR: vulnerabilities found in requirements.lock — fix before releasing." >&2
+    echo "ERROR: pip-audit failed on requirements.lock (see output above) — could be vulnerabilities, a resolve failure, or a parse error. Investigate before releasing." >&2
     exit 1
 fi
 if ! pip-audit -r requirements-gui.lock; then
-    echo "ERROR: vulnerabilities found in requirements-gui.lock — fix before releasing." >&2
+    echo "ERROR: pip-audit failed on requirements-gui.lock (see output above) — could be vulnerabilities, a resolve failure, or a parse error. Investigate before releasing." >&2
     exit 1
 fi
 
