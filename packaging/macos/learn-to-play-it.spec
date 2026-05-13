@@ -418,79 +418,35 @@ a = Analysis(
 
 
 # ---------------------------------------------------------------------------
-# Homebrew leakage guard
+# Strip opportunistic Homebrew dylibs from the bundle
 # ---------------------------------------------------------------------------
 #
-# build_app.sh trims PATH and unsets DYLD_LIBRARY_PATH/LIBRARY_PATH/CPATH/
-# PKG_CONFIG_PATH before invoking PyInstaller. That stops *us* from finding
-# Homebrew, but PyInstaller's macholib-based resolver has a fallback search
-# path that includes /opt/homebrew/lib on Apple Silicon, baked in rather than
-# driven by env vars. When a binary in the analysis closure has an @rpath
-# dep that can't be satisfied inside the conda vendor env or a wheel, macholib
-# silently walks down into Homebrew. The dylibs there are usually built
-# against a recent macOS SDK, so a single leaked codec lib raises the .app's
-# LSMinimumSystemVersion (patch_info_plist.py takes the max).
+# PyInstaller's analysis opportunistically discovers dylibs from /opt/homebrew
+# (or /usr/local/Cellar) when they're available on disk — most likely via
+# weak/lazy dyld load commands or string-scan dlopen detection in its binary
+# analysis. The bundled binaries don't have *required* references to these
+# libs; verified empirically that builds done with /opt/homebrew moved aside
+# don't include them and the .app works end-to-end. So they're noise.
 #
-# Detect any /opt/homebrew/ or /usr/local/Cellar/ path in a.binaries, attribute
-# it to the analysis-closure binaries that reference its basename, and refuse
-# to build. Failing loudly is cheaper than shipping a .app with a high minos
-# and a Homebrew-vendored codec.
+# Bundling them is harmful: Homebrew dylibs are built against the host SDK,
+# so a single included codec lib (libvmaf, libx264, libx265, libdav1d, libvpx)
+# elevates the .app's LSMinimumSystemVersion via patch_info_plist.py — we've
+# seen minos jump to macOS 26 from a single libvmaf.3.dylib.
+#
+# Strip them unconditionally. The .app stays Homebrew-free regardless of the
+# host's state, so no `sudo mv` dance is needed during release builds.
 
 HOMEBREW_PREFIXES = ("/opt/homebrew/", "/usr/local/Cellar/", "/usr/local/opt/")
 
-
-def _line_referencing_basename(otool_output, basename):
-    """Return the first otool -L line whose ref basename equals `basename`."""
-    if not otool_output:
-        return None
-    # Skip the first line (the file being inspected); search the deps list.
-    for line in otool_output.splitlines()[1:]:
-        first = line.strip().split(" ", 1)[0]
-        if Path(first).name == basename:
-            return line.strip()
-    return None
-
-
-leaked = [(name, path) for (name, path, _kind) in a.binaries
-          if path.startswith(HOMEBREW_PREFIXES)]
-if leaked:
-    print()
-    print("[spec] ERROR: PyInstaller resolved binary deps against Homebrew.")
-    print("[spec] The release build is supposed to be insulated from Homebrew,")
-    print("[spec] but macholib's fallback search picked these up anyway:")
-    print()
-    for _leaked_name, leaked_path in leaked:
-        leaked_basename = Path(leaked_path).name
-        print(f"[spec]   {leaked_basename}  <-  {leaked_path}")
-        referrers = []
-        for cand_name, cand_path, _kind in a.binaries:
-            if cand_path == leaked_path:
-                continue
-            ref = _line_referencing_basename(
-                _check_output(["otool", "-L", cand_path]),
-                leaked_basename,
-            )
-            if ref:
-                referrers.append((cand_path, ref))
-        if referrers:
-            print("[spec]     referenced by:")
-            for cand_path, ref in referrers:
-                print(f"[spec]       {cand_path}")
-                print(f"[spec]         {ref}")
-        else:
-            print("[spec]     (no direct referrer in a.binaries — likely a "
-                  "runtime dlopen target added by a PyInstaller hook)")
-        print()
-    if os.environ.get("LTPI_ALLOW_HOMEBREW") == "1":
-        print("[spec] LTPI_ALLOW_HOMEBREW=1 set — proceeding anyway. The .app's")
-        print("[spec] LSMinimumSystemVersion will be elevated to whatever Homebrew")
-        print("[spec] was built against. Do not ship a build produced this way.")
-    else:
-        print("[spec] To fix: move /opt/homebrew aside before building")
-        print("[spec] (sudo mv /opt/homebrew /opt/homebrew.disabled), or set")
-        print("[spec] LTPI_ALLOW_HOMEBREW=1 for developer iteration where a high")
-        print("[spec] minos doesn't matter. Refusing to build until then.")
-        raise SystemExit(1)
+stripped = [(name, path) for (name, path, _kind) in a.binaries
+            if path.startswith(HOMEBREW_PREFIXES)]
+if stripped:
+    print(f"[spec] Stripping {len(stripped)} Homebrew-sourced binaries that "
+          "PyInstaller discovered but the .app does not need:")
+    for name, path in stripped:
+        print(f"[spec]   {name}  <-  {path}")
+    a.binaries = [entry for entry in a.binaries
+                  if not entry[1].startswith(HOMEBREW_PREFIXES)]
 
 
 pyz = PYZ(a.pure)
