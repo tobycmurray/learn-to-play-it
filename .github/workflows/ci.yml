@@ -71,8 +71,8 @@ jobs:
 
       - name: Regenerate lockfiles
         run: |
-          pip-compile --quiet --generate-hashes --output-file requirements.lock pyproject.toml
-          pip-compile --quiet --generate-hashes --extra=gui --output-file requirements-gui.lock pyproject.toml
+          pip-compile --quiet --generate-hashes --allow-unsafe --output-file requirements.lock pyproject.toml
+          pip-compile --quiet --generate-hashes --allow-unsafe --extra=gui --output-file requirements-gui.lock pyproject.toml
 
       - name: Fail if lockfiles drifted
         run: |

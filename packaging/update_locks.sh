@@ -26,8 +26,8 @@ if ! command -v pip-compile >/dev/null 2>&1; then
     exit 1
 fi
 
-pip-compile $UPGRADE --generate-hashes --output-file requirements.lock pyproject.toml
-pip-compile $UPGRADE --generate-hashes --extra=gui --output-file requirements-gui.lock pyproject.toml
+pip-compile $UPGRADE --generate-hashes --allow-unsafe --output-file requirements.lock pyproject.toml
+pip-compile $UPGRADE --generate-hashes --allow-unsafe --extra=gui --output-file requirements-gui.lock pyproject.toml
 
 echo
 echo "Regenerated requirements.lock and requirements-gui.lock."
