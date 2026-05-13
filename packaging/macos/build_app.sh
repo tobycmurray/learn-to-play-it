@@ -17,7 +17,6 @@ BUILD_VENV="${BUILD_VENV:-.build-venv}"
 FFMPEG_CONDA_ENV="${FFMPEG_CONDA_ENV:-ltp-ffmpeg}"
 FFMPEG_CONDA_SPEC="${FFMPEG_CONDA_SPEC:-ffmpeg>=8,<9}"
 
-REGENERATE_LOCK="${REGENERATE_LOCK:-1}"
 LOCK_FILE="${LOCK_FILE:-requirements-gui.lock}"
 SPEC_FILE="${SPEC_FILE:-packaging/macos/learn-to-play-it.spec}"
 
@@ -96,16 +95,12 @@ import sys
 print("Build sys.version:    ", repr(sys.version))
 PY
 
-python -m pip install --upgrade pip "setuptools<82" wheel pip-tools
+python -m pip install --upgrade pip "setuptools<82" wheel
 
-if [[ "$REGENERATE_LOCK" == "1" ]]; then
-    python -m piptools compile \
-        --extra=gui \
-        --output-file="$LOCK_FILE" \
-        pyproject.toml
-fi
-
-python -m pip install -r "$LOCK_FILE"
+# Hash-pinned install: pip refuses any wheel whose sha256 doesn't match the
+# pin in $LOCK_FILE. To bump deps, run packaging/update_locks.sh, review the
+# diff, and commit — the lockfile is a controlled artifact, not a build output.
+python -m pip install --require-hashes -r "$LOCK_FILE"
 python -m pip install -e '.[gui]' --no-deps
 python -m pip install pyinstaller
 

@@ -117,7 +117,20 @@ def ensure_beats(audio_file: str) -> dict:
     return detect_beats(audio_file)
 
 
+# Override beat_this's default checkpoint URL to fetch from a release asset
+# on this repo. Rationale lives in learntoplayit/safe_torch.py module docstring
+# (per-model trust posture).
+# To rotate the model: cut a new `models-vN` release with the new file, bump
+# this URL, update safe_torch.EXPECTED_HASHES, ship.
+BEAT_THIS_CHECKPOINT_URL = (
+    "https://github.com/tobycmurray/learn-to-play-it/"
+    "releases/download/models-v1/beat_this-final0.ckpt"
+)
+
+
 def detect_beats(audio_file: str, from_stem: str | None = None) -> dict:
+    from . import safe_torch
+    safe_torch.install()
     from beat_this.inference import File2Beats
 
     if from_stem is not None:
@@ -126,7 +139,7 @@ def detect_beats(audio_file: str, from_stem: str | None = None) -> dict:
     else:
         input_path = audio_file
 
-    model = File2Beats(checkpoint_path="final0", device="cpu")
+    model = File2Beats(checkpoint_path=BEAT_THIS_CHECKPOINT_URL, device="cpu")
     try:
         beat_times, downbeat_times = model(input_path)
     except Exception as e:

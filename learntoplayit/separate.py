@@ -44,6 +44,8 @@ def separate_stems(audio_file: str) -> Path:
     audio_path = Path(audio_file).resolve()
     stems_dir = get_stems_dir(audio_file)
 
+    from . import safe_torch
+    safe_torch.install()
     from demucs.separate import main as demucs_main
 
     model = "htdemucs_6s"

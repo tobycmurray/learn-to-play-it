@@ -46,10 +46,37 @@ jobs:
         run: pytest tests/ -v --timeout=300
 
       - name: Audit lock files for known vulnerabilities
-        # Informational for now — doesn't fail the build. Flip to failing
-        # once we trust the signal-to-noise ratio.
-        continue-on-error: true
         run: |
           pip install pip-audit
           pip-audit -r requirements.lock
           pip-audit -r requirements-gui.lock
+
+  lockfile-fresh:
+    # Notification-only check: regenerates the lockfiles from pyproject.toml
+    # and fails (red ✗ → email) if the committed lockfiles drift. Does not
+    # block pushes — GitHub runs CI after the push lands. The fix is to run
+    # packaging/update_locks.sh, review the diff, and commit.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pip-tools
+        run: pip install pip-tools
+
+      - name: Regenerate lockfiles
+        run: |
+          pip-compile --quiet --generate-hashes --output-file requirements.lock pyproject.toml
+          pip-compile --quiet --generate-hashes --extra=gui --output-file requirements-gui.lock pyproject.toml
+
+      - name: Fail if lockfiles drifted
+        run: |
+          if ! git diff --exit-code requirements.lock requirements-gui.lock; then
+            echo "::error::Lockfiles are out of sync with pyproject.toml. Run packaging/update_locks.sh and commit." >&2
+            exit 1
+          fi
