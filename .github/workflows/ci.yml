@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+# Least-privilege token: neither job writes anything (no commits, no releases,
+# no PR comments). If a future job needs write access, override at the job
+# level rather than relaxing this workflow-wide default.
+permissions:
+  contents: read
+
 jobs:
   test:
     runs-on: ubuntu-latest
