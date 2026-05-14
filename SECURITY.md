@@ -149,6 +149,13 @@ both supported paths, **[.app]** for the binary release only, and
 - **[.app] Notarized DMG.** Apple's notary service scans every build before
   distribution; the DMG is stapled so Gatekeeper validates offline on the
   user's Mac.
+- **CI runs read-only and does not produce releases** (release process, not
+  user-facing). The `.github/workflows/ci.yml` workflow sets
+  `permissions: contents: read`, so even if a CI step were compromised
+  (e.g. via a malicious dependency installed during `pip install pip-audit`),
+  it couldn't push commits, create releases, modify lockfiles, or otherwise
+  affect what reaches users. The `.app` and `.dmg` are built and signed on
+  the maintainer's machine, never in CI.
 - **CI vulnerability scanning** (release process, not user-facing).
   `pip-audit` runs against the lockfiles on every push, hard-failing on any
   known CVE. A separate `lockfile-audit` job regenerates the lockfiles and
