@@ -31,6 +31,31 @@ For other platforms, older macOS versions, or to use the command-line interface,
 
 ## Installation
 
+Two source install paths. The **hash-pinned** install is recommended if you
+care about supply-chain integrity — it matches the trust model documented in
+[SECURITY.md](SECURITY.md). The **development** install is faster for
+iteration but trusts whatever PyPI is currently serving.
+
+### Hash-pinned install (recommended)
+
+```bash
+git clone https://github.com/tobycmurray/learn-to-play-it.git
+cd learn-to-play-it
+python3 -m venv .venv
+source .venv/bin/activate
+pip install --require-hashes -r requirements.lock
+pip install -e . --no-deps
+```
+
+The `--require-hashes` flag tells pip to refuse any wheel whose SHA-256
+doesn't match the pin in the lockfile. The lockfile is regenerated and
+committed deliberately (see `packaging/update_locks.sh`), so installing
+this way matches exactly what was pinned at release time.
+
+### Development install
+
+For iteration or exploration where supply-chain integrity isn't a concern:
+
 ```bash
 git clone https://github.com/tobycmurray/learn-to-play-it.git
 cd learn-to-play-it
@@ -39,26 +64,22 @@ source .venv/bin/activate
 pip install -e .
 ```
 
-For reproducible installs with pinned dependencies:
-
-```bash
-pip install -r requirements.lock && pip install -e . --no-deps
-```
-
-This installs the `ltpi` command into your virtualenv. Activate the venv (`source .venv/bin/activate`) before each session.
+This installs the `ltpi` command into your virtualenv. Activate the venv
+(`source .venv/bin/activate`) before each session.
 
 ### GUI
 
-To install with the graphical interface:
+Hash-pinned:
+
+```bash
+pip install --require-hashes -r requirements-gui.lock
+pip install -e ".[gui]" --no-deps
+```
+
+Development:
 
 ```bash
 pip install -e ".[gui]"
-```
-
-Or with pinned dependencies:
-
-```bash
-pip install -r requirements-gui.lock && pip install -e ".[gui]" --no-deps
 ```
 
 Then launch with:
@@ -149,23 +170,23 @@ Playing: guitar
 Controls: SPACE=play/pause  W/S=speed  E/D=pitch  Z/X/C/V=seek  H=hold
           [/]=loop start/end  L=loop  B=click  N=count-in  1/2/3=solo/backing/mix  0=restart  Q=quit
 
-  ⏸ 0:04.13 / 3:19.22  |  speed: 80%  |  pitch: 0c  |  loop: ON 0:00.45-0:07.50  |  click: ON  |  count-in: ON  |  mode: mix  |  part: guitar      
-                                                                                                                            ▂                      
-                                                                                                                            █                      
-                                                                                                                            █       ▇▄             
-                                                                                                                            █▂      ██▃            
-                                                                                                                            ██▃     ███▂▂▁▂        
-                                                                                                                            ███▅▆▁▁▃███████▄▆▃▇▆▇  
-  ▁▁ ▁▁▁▁▁   ▁▂▁      ▁▁▁  ▁            ▁▃▂▁    ▁▄▂▁▁▂▂▁▁▁▁▁▁ ▁▁   ▁  ▁▁▁▁▁▁        ▄▄▃▁▁▁       ▁▂▁           ▄▂▁▁▁    ▁  ▇█████████████████████  
-  ██▇█████▇▆▆███▇▇▆▆▆▅███▇▆█▇▆▆▆▆▅▅▅▆▆▇▇████▇▇▇▇█████████████▇██▇▆▆█▇▇██████▇▇▅▅▇▇▆▅██████▇▆▆▇▇▆▆███▇▆▇▇▆▆▇▇▆▅▅█████▇▇▇▆█▇▇██████████████████████  
-  ▁▁ ▁▁▁▁▁   ▁▂▁      ▁▁▁  ▁            ▁▃▂▁    ▁▄▂▁▁▂▂▁▁▁▁▁▁ ▁▁   ▁  ▁▁▁▁▁▁        ▄▄▃▁▁▁       ▁▂▁           ▄▂▁▁▁    ▁  ▇█████████████████████  
-                                                                                                                            ███▅▆▁▁▃███████▄▆▃▇▆▇  
-                                                                                                                            ██▃     ███▂▂▁▂        
-                                                                                                                            █▂      ██▃            
-                                                                                                                            █       ▇▄             
-                                                                                                                            █                      
-                                                                                                                            ▂                      
-         .       .        .        |        .        .        .        | ↑     |        |        .        |        .        |        |       ]     
+  ⏸ 0:04.13 / 3:19.22  |  speed: 80%  |  pitch: 0c  |  loop: ON 0:00.45-0:07.50  |  click: ON  |  count-in: ON  |  mode: mix  |  part: guitar
+                                                                                                                            ▂
+                                                                                                                            █
+                                                                                                                            █       ▇▄
+                                                                                                                            █▂      ██▃
+                                                                                                                            ██▃     ███▂▂▁▂
+                                                                                                                            ███▅▆▁▁▃███████▄▆▃▇▆▇
+  ▁▁ ▁▁▁▁▁   ▁▂▁      ▁▁▁  ▁            ▁▃▂▁    ▁▄▂▁▁▂▂▁▁▁▁▁▁ ▁▁   ▁  ▁▁▁▁▁▁        ▄▄▃▁▁▁       ▁▂▁           ▄▂▁▁▁    ▁  ▇█████████████████████
+  ██▇█████▇▆▆███▇▇▆▆▆▅███▇▆█▇▆▆▆▆▅▅▅▆▆▇▇████▇▇▇▇█████████████▇██▇▆▆█▇▇██████▇▇▅▅▇▇▆▅██████▇▆▆▇▇▆▆███▇▆▇▇▆▆▇▇▆▅▅█████▇▇▇▆█▇▇██████████████████████
+  ▁▁ ▁▁▁▁▁   ▁▂▁      ▁▁▁  ▁            ▁▃▂▁    ▁▄▂▁▁▂▂▁▁▁▁▁▁ ▁▁   ▁  ▁▁▁▁▁▁        ▄▄▃▁▁▁       ▁▂▁           ▄▂▁▁▁    ▁  ▇█████████████████████
+                                                                                                                            ███▅▆▁▁▃███████▄▆▃▇▆▇
+                                                                                                                            ██▃     ███▂▂▁▂
+                                                                                                                            █▂      ██▃
+                                                                                                                            █       ▇▄
+                                                                                                                            █
+                                                                                                                            ▂
+         .       .        .        |        .        .        .        | ↑     |        |        .        |        .        |        |       ]
 ```
 
 **Modes** -- chosen using number keys 1 (solo), 2 (backing), and 3(mix):
