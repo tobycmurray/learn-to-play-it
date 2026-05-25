@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import numpy as np
 from PySide6.QtCore import Qt, QTimer, QSize
 from PySide6.QtGui import QKeySequence, QShortcut, QPainter, QColor, QPen, QIcon, QPixmap
 from PySide6.QtSvg import QSvgRenderer
@@ -17,7 +18,8 @@ from .player import (
 )
 from .fmt import fmt_time, fmt_pitch
 
-WAVEFORM_BINS = 100
+DEFAULT_VIEWPORT_SECONDS = 10.0
+ZOOM_WHEEL_FACTOR_PER_NOTCH = 1.15
 WAVEFORM_COLOR = QColor(70, 130, 220)
 PLAYHEAD_COLOR = QColor(255, 60, 60)
 BEAT_RULER_COLOR = QColor(230, 230, 220, 70)
@@ -126,16 +128,70 @@ class ActionButton(QPushButton):
             self._update_icon()
 
 
+def _peak_per_pixel(bins: np.ndarray, w: int, bin_offset: float) -> np.ndarray:
+    """Per-pixel peak envelope for waveform rendering.
+
+    `bins` has length num_bins + 1; the +1 is the partial bin past the
+    viewport's right edge. Returns an array of length `w` with the peak
+    amplitude per pixel column.
+
+    Each pixel column x covers bin indices [x*bpp + bin_offset,
+    (x+1)*bpp + bin_offset). reduceat takes the max over [starts[i],
+    starts[i+1]) for i<w-1 and [starts[w-1], len(bins)) for the last —
+    so the rightmost pixel naturally includes the +1 partial-edge bin.
+    Removing the +1, or changing the bin_offset sign, would silently
+    break the right-edge / smooth-scroll behavior; tests pin this.
+    """
+    num_bins = len(bins) - 1
+    bins_per_pixel = num_bins / w
+    starts = (np.arange(w) * bins_per_pixel + bin_offset).astype(int)
+    return np.maximum.reduceat(bins, starts)
+
+
+class ViewportZoom:
+    """Waveform viewport zoom level.
+
+    Stored as a float (seconds) but exposed only as an integer bin count.
+
+    Why: Player.waveform_bins() requires an integer num_bins — it sizes a
+    numpy array. But zoom intent must accumulate as a float; if we stored
+    bins as an int and multiplied per wheel tick, small ticks at high zoom
+    would round back to the same int and get lost ("stuck wheel"). Keeping
+    seconds as the source of truth, rounding only when handing off to
+    waveform_bins(), preserves intent across sub-bin wheel ticks.
+
+    Invariant: callers must obtain bin counts via num_bins(). Do not read
+    _seconds directly or store a separate int bin count.
+    """
+
+    MIN_BINS = 20  # floor on zoom-in; viewport never narrower than 20 * NUDGE_SECONDS
+
+    def __init__(self, seconds: float):
+        self._seconds = seconds
+
+    def num_bins(self, song_duration: float) -> int:
+        max_bins = max(self.MIN_BINS, int(song_duration / NUDGE_SECONDS))
+        bins = round(self._seconds / NUDGE_SECONDS)
+        return max(self.MIN_BINS, min(bins, max_bins))
+
+    def zoom(self, factor: float, song_duration: float) -> None:
+        """factor > 1 zooms out (wider viewport); < 1 zooms in."""
+        min_seconds = self.MIN_BINS * NUDGE_SECONDS
+        max_seconds = max(min_seconds, song_duration)
+        self._seconds = max(min_seconds, min(self._seconds * factor, max_seconds))
+
+
 class WaveformWidget(QWidget):
 
     def __init__(self):
         super().__init__()
         self.player = None
+        self._zoom = ViewportZoom(DEFAULT_VIEWPORT_SECONDS)
         self.setMinimumHeight(220)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setCursor(Qt.PointingHandCursor)
         self.setMouseTracking(True)
-        self.setToolTip("Click to seek. Hold Shift to snap to the nearest beat.")
+        self.setToolTip("Click to seek. Hold Shift to snap to the nearest beat. Scroll to zoom.")
         # Mouse pixel x while hovering over the widget, or None when the
         # cursor is elsewhere. Resolved to a global bin in paintEvent so the
         # hover line tracks the mouse (not the song content) as playback scrolls.
@@ -151,6 +207,17 @@ class WaveformWidget(QWidget):
         if self._hover_mouse_x is not None:
             self._hover_mouse_x = None
             self.update()
+
+    def wheelEvent(self, event):
+        if self.player is None:
+            return super().wheelEvent(event)
+        delta = event.angleDelta().y()
+        if delta == 0:
+            return super().wheelEvent(event)
+        factor = ZOOM_WHEEL_FACTOR_PER_NOTCH ** (-delta / 120.0)
+        self._zoom.zoom(factor, self.player.song_duration)
+        event.accept()
+        self.update()
 
     def _target_col_for_x(self, x, wd, modifiers):
         col = x / self.width() * wd.num_bins
@@ -169,7 +236,7 @@ class WaveformWidget(QWidget):
             return super().mousePressEvent(event)
         if self.width() < 10:
             return
-        wd = self.player.waveform_bins(WAVEFORM_BINS)
+        wd = self.player.waveform_bins(self._zoom.num_bins(self.player.song_duration))
         target_col = self._target_col_for_x(event.position().x(), wd, event.modifiers())
         if target_col is None:
             return
@@ -195,23 +262,24 @@ class WaveformWidget(QWidget):
             painter.end()
             return
 
-        wd = self.player.waveform_bins(WAVEFORM_BINS)
+        wd = self.player.waveform_bins(self._zoom.num_bins(self.player.song_duration))
         bar_w = w / wd.num_bins
 
-        # Each bin in wd.bins[i] sits at visual column (i - bin_offset). As
-        # playback advances, bin_offset increases smoothly from 0 to 1, then
-        # wraps as the viewport's left edge crosses a bin boundary.
-        def bin_left_x(i):
-            return int((i - wd.bin_offset) * bar_w)
-
+        # Per-pixel envelope avoids subpixel aliasing when num_bins > w:
+        # a per-bin loop with int() rounding would only draw bins that
+        # straddle a pixel boundary, and which bins those are shifts as
+        # bin_offset slides — visible as shimmer during playback.
+        # We use peak (max), not mean: mean smooths the residual shimmer
+        # more but flattens the waveform — quiet/loud passages look alike
+        # and drum hits disappear. We tried both; max's mild residual
+        # shimmer is worth the better visual character.
+        peaks = _peak_per_pixel(wd.bins, w, wd.bin_offset)
         painter.setPen(Qt.NoPen)
         painter.setBrush(WAVEFORM_COLOR)
-        for i, v in enumerate(wd.bins):
-            half_h = int(v * inner_h / 2)
+        for x in range(w):
+            half_h = int(peaks[x] * inner_h / 2)
             if half_h > 0:
-                x = bin_left_x(i)
-                bw = bin_left_x(i + 1) - x
-                painter.drawRect(x, mid - half_h, bw, half_h * 2)
+                painter.drawRect(x, mid - half_h, 1, half_h * 2)
 
         def col_to_x(col):
             return int(col * bar_w)
