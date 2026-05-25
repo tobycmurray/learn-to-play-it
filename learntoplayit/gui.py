@@ -191,7 +191,7 @@ class WaveformWidget(QWidget):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         self.setCursor(Qt.PointingHandCursor)
         self.setMouseTracking(True)
-        self.setToolTip("Click to seek. Hold Shift to snap to the nearest beat. Scroll to zoom.")
+        self.setToolTip("Click to seek. Hold Shift to snap to the nearest beat. Scroll up/down to zoom.")
         # Mouse pixel x while hovering over the widget, or None when the
         # cursor is elsewhere. Resolved to a global bin in paintEvent so the
         # hover line tracks the mouse (not the song content) as playback scrolls.
