@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="packaging/macos/learntoplayit/resources/app_icon.png" alt="Learn To Play It" width="128">
+  <img src="learntoplayit/resources/app_icon.png" alt="Learn To Play It" width="128">
 </p>
 
 # Learn To Play It (ltpi)
