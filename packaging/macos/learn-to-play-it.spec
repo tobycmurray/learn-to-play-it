@@ -12,6 +12,7 @@ from PyInstaller.utils.hooks import (
     collect_data_files,
     collect_dynamic_libs,
     collect_submodules,
+    copy_metadata,
 )
 
 SPEC_PATH = Path(SPEC).resolve()
@@ -37,6 +38,10 @@ hiddenimports = []
 # Ship the project's own LICENSE in the bundle so the GPL-2 license terms are
 # discoverable from the .app itself, not only from the GitHub repo.
 datas += [(str(PROJECT_ROOT / "LICENSE"), ".")]
+
+# Ship our own dist-info so importlib.metadata.version("learn-to-play-it") works
+# inside the frozen .app — used by the About dialog.
+datas += copy_metadata("learn-to-play-it")
 
 
 # ---------------------------------------------------------------------------
@@ -330,15 +335,9 @@ binaries += _collect_conda_ffmpeg_dylibs()
 # App resources
 # ---------------------------------------------------------------------------
 
-resource_candidates = [
-    SPEC_DIR / "learntoplayit/resources/app_icon.png",
-    PROJECT_ROOT / "learntoplayit/resources/app_icon.png",
-]
-
-for resource in resource_candidates:
-    if resource.exists():
-        datas.append((str(resource), "learntoplayit/resources"))
-        break
+app_icon = PROJECT_ROOT / "learntoplayit/resources/app_icon.png"
+if app_icon.exists():
+    datas.append((str(app_icon), "learntoplayit/resources"))
 
 
 # ---------------------------------------------------------------------------

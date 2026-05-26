@@ -2,10 +2,12 @@ import os
 import re
 import shutil
 import sys
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
+from importlib.resources import files as _resource_files
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QThread, Signal
-from PySide6.QtGui import QAction, QKeySequence, QShortcut
+from PySide6.QtGui import QAction, QKeySequence, QPixmap, QShortcut
 from PySide6.QtWidgets import (
     QApplication, QMainWindow, QWidget,
     QVBoxLayout, QHBoxLayout,
@@ -26,6 +28,13 @@ from .separate import STEM_NAMES
 APP_NAME = "Learn To Play It"
 
 AUDIO_EXTENSIONS = (".mp3", ".wav", ".flac", ".ogg", ".m4a", ".aac")
+
+
+def app_version() -> str:
+    try:
+        return _pkg_version("learn-to-play-it")
+    except PackageNotFoundError:
+        return "unknown"
 
 def add_bundled_bin_to_path():
     if getattr(sys, "frozen", False):
@@ -314,6 +323,31 @@ class AppWindow(QMainWindow):
         quit_action.setShortcut(QKeySequence.Quit)
         quit_action.triggered.connect(self.close)
         file_menu.addAction(quit_action)
+
+        help_menu = menu.addMenu("&Help")
+
+        about_action = QAction(f"&About {APP_NAME}", self)
+        # On macOS, AboutRole moves this into the application menu automatically.
+        about_action.setMenuRole(QAction.AboutRole)
+        about_action.triggered.connect(self._show_about)
+        help_menu.addAction(about_action)
+
+    def _show_about(self):
+        box = QMessageBox(self)
+        box.setWindowTitle(f"About {APP_NAME}")
+        box.setTextFormat(Qt.RichText)
+        box.setText(
+            f"<h3>{APP_NAME}</h3>"
+            f"<p>Version {app_version()}</p>"
+            "<p>Isolate any instrument from a song. Slow it down. Learn to play it.</p>"
+            "<p>Licensed under GPL-2.0.<br>"
+            "<a href=\"https://learntoplayit.com\">learntoplayit.com</a></p>"
+        )
+        icon_path = _resource_files("learntoplayit.resources").joinpath("app_icon.png")
+        pixmap = QPixmap(str(icon_path))
+        if not pixmap.isNull():
+            box.setIconPixmap(pixmap.scaledToWidth(96, Qt.SmoothTransformation))
+        box.exec()
 
     def _bind_keys(self):
         shortcuts = {

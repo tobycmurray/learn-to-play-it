@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/../.."
 
-src="packaging/macos/learntoplayit/resources/app_icon.png"
+src="learntoplayit/resources/app_icon.png"
 out="packaging/macos/AppIcon.icns"
 iconset="packaging/macos/AppIcon.iconset"
 
