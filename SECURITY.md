@@ -156,14 +156,46 @@ both supported paths, **[.app]** for the binary release only, and
   it couldn't push commits, create releases, modify lockfiles, or otherwise
   affect what reaches users. The `.app` and `.dmg` are built and signed on
   the maintainer's machine, never in CI.
-- **CI vulnerability scanning** (release process, not user-facing).
-  `pip-audit` runs against the lockfiles on every push, hard-failing on any
-  known CVE. A separate `lockfile-audit` job regenerates the lockfiles and
-  fails (red ✗ → notification email) if the committed versions drift from
-  `pyproject.toml`.
+- **CI vulnerability scanning** (release process, not user-facing). The
+  `lockfile-audit` job runs `packaging/audit_locks.sh` on every push, which
+  audits both lockfiles with `pip-audit` and hard-fails on any known CVE
+  except those explicitly assessed and recorded in
+  `packaging/suppressed-cves.txt` (see "Suppressed advisories" below). The
+  same job also regenerates the lockfiles from `pyproject.toml` and fails
+  (red ✗ → notification email) if the committed versions drift.
 - **Release-time vuln gate** (release process, not user-facing).
-  `packaging/macos/publish_release.sh` re-runs `pip-audit` and refuses to
-  publish on any failure.
+  `packaging/macos/publish_release.sh` runs the same
+  `packaging/audit_locks.sh` and refuses to publish on any failure — so an
+  identical audit and suppression policy gates both CI and release.
+
+## Suppressed advisories
+
+Occasionally `pip-audit` reports a CVE in a bundled dependency that has no
+upstream fix and is not reachable in this app's actual usage. Rather than
+disable the scanner or pin around a fix that doesn't exist, we suppress the
+specific advisory ID — but only under a documented, self-expiring assessment.
+
+`packaging/suppressed-cves.txt` records each suppressed CVE alongside the
+SHA-256 fingerprints of the lockfiles it was assessed against.
+`packaging/audit_locks.sh` honours a suppression only while the lockfiles
+still match those fingerprints; if either lockfile changes (e.g. after
+`packaging/update_locks.sh`), all suppressions are discarded and the audit
+runs clean, forcing a fresh reachability assessment. A suppression therefore
+cannot outlive the exact dependency set it was justified against.
+
+Currently suppressed:
+
+- **CVE-2025-3000 / GHSA-rrmf-rvhw-rf47** (`torch`) — memory corruption in
+  `torch.jit.script`, exploitable only by getting the victim to compile or
+  load an attacker-controlled TorchScript program. This app never does that:
+  neither our code nor demucs, beat_this, torchaudio, or torchcodec call
+  `torch.jit.script` / `torch.jit.load`, and the only model-loading path
+  (`learntoplayit/safe_torch.py`) verifies a pinned SHA-256 before
+  `torch.load`, so no untrusted bytes reach any torch loader. No fixed version
+  has been published (empty `fix_versions`). Assessed 2026-07-07 against the
+  lockfiles fingerprinted in the manifest. This is the "out of scope" clause
+  above in practice: an upstream CVE that doesn't affect this app's actual
+  usage context.
 
 ## Known limitations
 

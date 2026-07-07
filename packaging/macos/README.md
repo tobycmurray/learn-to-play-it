@@ -71,6 +71,12 @@ Review the diff, then commit. CI catches a missed regen after a `pyproject.toml`
 edit (red ✗ on the `lockfile-audit` job) but does not block the push.
 The script uses `uv pip compile --universal` so lockfiles work cross-platform.
 
+Changing the lockfiles also invalidates any CVE suppressions: they're bound to
+the lockfile SHA-256s in `packaging/suppressed-cves.txt`, so after a regen run
+`packaging/audit_locks.sh` and re-assess anything it flags (see "Suppressed
+advisories" in `SECURITY.md`). If a finding is still not exploitable, paste the
+new hashes into the manifest; if the CVE is gone, delete its line.
+
 **Bump FFmpeg** (refresh the conda vendor env with newer FFmpeg / transitive deps):
 ```
 packaging/update_ffmpeg.sh --upgrade   # solve fresh from FFMPEG_CONDA_SPEC

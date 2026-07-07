@@ -76,9 +76,10 @@ jobs:
         run: pip install uv pip-audit
 
       - name: Audit lock files for known vulnerabilities
-        run: |
-          pip-audit -r requirements.lock
-          pip-audit -r requirements-gui.lock
+        # Delegates to packaging/audit_locks.sh, which honours the assessed
+        # suppressions in packaging/suppressed-cves.txt only while the lockfiles
+        # match their recorded fingerprints (fail-closed on any change).
+        run: packaging/audit_locks.sh
 
       - name: Regenerate lockfiles
         run: |

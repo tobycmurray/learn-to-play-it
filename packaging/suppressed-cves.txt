@@ -1,0 +1,32 @@
+# packaging/suppressed-cves.txt
+#
+# pip-audit findings we have assessed as NOT exploitable in this app and are
+# deliberately suppressing. Read and enforced by packaging/audit_locks.sh,
+# which both CI (.github/workflows/ci.yml) and the release gate
+# (packaging/macos/publish_release.sh) call.
+#
+# HOW IT WORKS
+#   Every suppression below is valid ONLY against the exact lockfiles whose
+#   SHA-256 hashes are recorded in [lockfiles]. audit_locks.sh recomputes
+#   those hashes on each run; if either differs it discards ALL suppressions
+#   and runs pip-audit clean — so any still-present CVE fails the build and
+#   forces a fresh reachability assessment. The green signal therefore only
+#   ever means "assessed against the deps we actually ship right now."
+#
+# HOW TO RE-BLESS (after the lockfiles change, e.g. packaging/update_locks.sh)
+#   1. Run packaging/audit_locks.sh. On a hash mismatch it prints the new
+#      hashes and the CVE(s) that need re-assessment.
+#   2. Re-judge each CVE against the NEW lockfiles (is the vulnerable code path
+#      now reachable? did a fixed version ship?). Full write-ups live in
+#      SECURITY.md under "Suppressed advisories".
+#   3. If a CVE is still safe to suppress, paste the new hashes into
+#      [lockfiles]. If pip-audit no longer reports it at all, delete its line
+#      from [suppress] instead of re-blessing.
+
+[lockfiles]
+requirements.lock      1a84392606e6f3d5ddcf5c70e96a304be049a0d29690e0f8f4479af45017ff85
+requirements-gui.lock  535c4aa52a5094e7982f9d57f9be1e856311703482426a2da20cc391c1daca71
+
+[suppress]
+# CVE            assessed    one-line rationale (full narrative in SECURITY.md)
+CVE-2025-3000    2026-07-07  torch.jit.script memory corruption; unreachable — no jit.script/jit.load in our code or demucs/beat_this/torchaudio/torchcodec; no upstream fix (empty fix_versions).

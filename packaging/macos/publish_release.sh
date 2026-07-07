@@ -82,18 +82,12 @@ fi
 # Audit the lock files for known CVEs in bundled deps. The .app bundles its
 # own Python and dependencies, so anything vulnerable in the lock files
 # stays vulnerable in shipped users' installs until the next release. Refuse
-# to publish if pip-audit finds anything.
+# to publish if the audit finds anything. audit_locks.sh honours the assessed
+# suppressions in packaging/suppressed-cves.txt only while the lockfiles match
+# their recorded fingerprints, so a stale suppression fails closed here too.
 echo "==> Auditing lock files for known vulnerabilities"
-if ! command -v pip-audit >/dev/null 2>&1; then
-    echo "ERROR: pip-audit not installed. Install with: pip install pip-audit" >&2
-    exit 1
-fi
-if ! pip-audit -r requirements.lock; then
-    echo "ERROR: pip-audit failed on requirements.lock (see output above) — could be vulnerabilities, a resolve failure, or a parse error. Investigate before releasing." >&2
-    exit 1
-fi
-if ! pip-audit -r requirements-gui.lock; then
-    echo "ERROR: pip-audit failed on requirements-gui.lock (see output above) — could be vulnerabilities, a resolve failure, or a parse error. Investigate before releasing." >&2
+if ! packaging/audit_locks.sh; then
+    echo "ERROR: lockfile audit failed (see output above) — could be vulnerabilities, a resolve failure, a parse error, or a suppression whose fingerprint is stale. Investigate before releasing." >&2
     exit 1
 fi
 
